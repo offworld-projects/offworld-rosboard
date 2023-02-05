@@ -126,7 +126,7 @@ class Space3DViewer extends Viewer {
     touchRegion.bind(this.gl.canvas, 'panGesture', (e) => {
       if (e.detail.data[0]) {
         that.cam_offset_x += e.detail.data[0].change.x / 30 * Math.sin(that.cam_theta);
-        that.cam_offset_y -= e.detail.data[0].change.y / 30 * Math.cos(that.cam_theta);
+        that.cam_offset_y -= e.detail.data[0].change.x / 30 * Math.cos(that.cam_theta);
         that.cam_offset_z += e.detail.data[0].change.y / 30;
         that.updatePerspective();
       }
