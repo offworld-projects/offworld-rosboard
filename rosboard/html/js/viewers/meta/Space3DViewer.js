@@ -57,7 +57,7 @@ class Space3DViewer extends Viewer {
     this.mvp = mat4.create();
     this.temp = mat4.create();
     
-    this.gl.captureMouse(true, true);
+    // this.gl.captureMouse(true, true);
 		this.gl.onmouse = function(e) {
 			if(e.dragging) {
         if(e.rightButton) {
@@ -89,6 +89,56 @@ class Space3DViewer extends Viewer {
       if(that.cam_r > 1000.0) that.cam_r = 1000.0;
       that.updatePerspective();
     }
+
+    var touchRegion = ZingTouch.Region(this.gl.canvas)
+
+    // One finger drag to rotate
+    var rotateGesture = new ZingTouch.Pan({
+      numInputs: 1
+    })
+    touchRegion.register('rotateGesture', rotateGesture)
+
+    touchRegion.bind(this.gl.canvas, 'rotateGesture', (e) => {
+      console.log(e.detail)
+      if (e.detail.data[0]) {
+        const change = e.detail.data[0].change;
+        if (Math.abs(change.x) > 100 || Math.abs(change.y) > 100) return;
+        that.cam_theta -= change.x / 300;
+        that.cam_phi -= change.y / 300;
+
+        // avoid euler singularities
+        // also don't let the user flip the entire cloud around
+        if (that.cam_phi < 0) {
+          that.cam_phi = 0.001;
+        }
+        if (that.cam_phi > Math.PI) {
+          that.cam_phi = Math.PI - 0.001;
+        }
+        that.updatePerspective();
+      }
+    })
+
+    // Two fingers to pan the view
+    var panGesture = new ZingTouch.Pan({
+      numInputs: 2
+    })
+    touchRegion.register('panGesture', panGesture)
+    touchRegion.bind(this.gl.canvas, 'panGesture', (e) => {
+      if (e.detail.data[0]) {
+        that.cam_offset_x += e.detail.data[0].change.x / 30 * Math.sin(that.cam_theta);
+        that.cam_offset_y -= e.detail.data[0].change.y / 30 * Math.cos(that.cam_theta);
+        that.cam_offset_z += e.detail.data[0].change.y / 30;
+        that.updatePerspective();
+      }
+    })
+
+    // Pinch to zoom in or out
+    touchRegion.bind(this.gl.canvas, 'distance', (e) => {
+      that.cam_r -= e.detail.change / 5;
+      if (that.cam_r < 1.0) that.cam_r = 1.0;
+      if (that.cam_r > 1000.0) that.cam_r = 1000.0;
+      that.updatePerspective();
+    })
 
     this.updatePerspective = () => {
       that.cam_pos[0] = that.cam_offset_x + that.cam_r * Math.sin(that.cam_phi) * Math.cos(that.cam_theta);
