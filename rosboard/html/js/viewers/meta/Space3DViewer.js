@@ -99,7 +99,6 @@ class Space3DViewer extends Viewer {
     touchRegion.register('rotateGesture', rotateGesture)
 
     touchRegion.bind(this.gl.canvas, 'rotateGesture', (e) => {
-      console.log(e.detail)
       if (e.detail.data[0]) {
         const change = e.detail.data[0].change;
         if (Math.abs(change.x) > 100 || Math.abs(change.y) > 100) return;
