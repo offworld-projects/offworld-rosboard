@@ -2,7 +2,10 @@ import base64
 import io
 import numpy as np
 from rosboard.cv_bridge import imgmsg_to_cv2
-import rosboard.rospy2 as rospy
+
+from bot_events import init_log
+
+log = init_log("ROSBOARD")
 
 try:
     import simplejpeg
@@ -239,6 +242,8 @@ DATATYPE_MAPPING_PCL2_NUMPY = {
 }
 
 def compress_point_cloud2(msg, output):
+    """Safely compress a point cloud message, continues if an exception is encountered
+    """
     # assuming fields are ('x', 'y', 'z', ...),
     # compression scheme is:
     # msg['_data_uint16'] = {
@@ -281,48 +286,52 @@ def compress_point_cloud2(msg, output):
         points = points[idx]
 
     try:
-        xpoints = points['x'].astype(np.float32)
-        xmax = np.max(xpoints)
-        xmin = np.min(xpoints)
-        if xmax - xmin < 1.0:
-            xmax = xmin + 1.0
-        xpoints_uint16 = (65535 * (xpoints - xmin) / (xmax - xmin)).astype(np.uint16)
-
-        ypoints = points['y'].astype(np.float32)
-        ymax = np.max(ypoints)
-        ymin = np.min(ypoints)
-        if ymax - ymin < 1.0:
-            ymax = ymin + 1.0
-        ypoints_uint16 = (65535 * (ypoints - ymin) / (ymax - ymin)).astype(np.uint16)
-        
-        if "z" in field_names:
-            zpoints = points['z'].astype(np.float32)
-            zmax = np.max(zpoints)
-            zmin = np.min(zpoints)
-            if zmax - zmin < 1.0:
-                zmax = zmin + 1.0
-            zpoints_uint16 = (65535 * (zpoints - zmin) / (zmax - zmin)).astype(np.uint16)
-        else:
-            zmax = 1.0
-            zmin = 0.0
-            zpoints_uint16 = ypoints_uint16 * 0
-        
-        bounds_uint16 = [xmin, xmax, ymin, ymax, zmin, zmax]
-        if np.little_endian:
-            points_uint16 = np.stack((xpoints_uint16, ypoints_uint16, zpoints_uint16),1).ravel().view(dtype=np.uint8)
-        else:
-            points_uint16 = np.stack((xpoints_uint16, ypoints_uint16, zpoints_uint16),1).ravel().byteswap().view(dtype=np.uint8)
-
-        output["_data_uint16"] = {
-            "type": "xyz",
-            "bounds": list(map(float, bounds_uint16)),
-            "points": base64.b64encode(points_uint16).decode(),
-        }
-    
+        perform_point_cloud_compression(points, field_names, output)
+            
     except Exception as e:
-        rospy.logerr(f"Error compressing PointCloud2d:\n{str(e)}")
+        log.error(f"Error compressing PointCloud2d:\n{str(e)}")
         output["_error"] = str(e)
 
+def perform_point_cloud_compression(points, field_names, output):
+    """Compress a point cloud message
+    """
+    xpoints = points['x'].astype(np.float32)
+    xmax = np.max(xpoints)
+    xmin = np.min(xpoints)
+    if xmax - xmin < 1.0:
+        xmax = xmin + 1.0
+    xpoints_uint16 = (65535 * (xpoints - xmin) / (xmax - xmin)).astype(np.uint16)
+
+    ypoints = points['y'].astype(np.float32)
+    ymax = np.max(ypoints)
+    ymin = np.min(ypoints)
+    if ymax - ymin < 1.0:
+        ymax = ymin + 1.0
+    ypoints_uint16 = (65535 * (ypoints - ymin) / (ymax - ymin)).astype(np.uint16)
+    
+    if "z" in field_names:
+        zpoints = points['z'].astype(np.float32)
+        zmax = np.max(zpoints)
+        zmin = np.min(zpoints)
+        if zmax - zmin < 1.0:
+            zmax = zmin + 1.0
+        zpoints_uint16 = (65535 * (zpoints - zmin) / (zmax - zmin)).astype(np.uint16)
+    else:
+        zmax = 1.0
+        zmin = 0.0
+        zpoints_uint16 = ypoints_uint16 * 0
+    
+    bounds_uint16 = [xmin, xmax, ymin, ymax, zmin, zmax]
+    if np.little_endian:
+        points_uint16 = np.stack((xpoints_uint16, ypoints_uint16, zpoints_uint16),1).ravel().view(dtype=np.uint8)
+    else:
+        points_uint16 = np.stack((xpoints_uint16, ypoints_uint16, zpoints_uint16),1).ravel().byteswap().view(dtype=np.uint8)
+
+    output["_data_uint16"] = {
+        "type": "xyz",
+        "bounds": list(map(float, bounds_uint16)),
+        "points": base64.b64encode(points_uint16).decode(),
+    }
 
 def compress_laser_scan(msg, output):
     # compression scheme:

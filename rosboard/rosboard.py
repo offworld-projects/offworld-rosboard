@@ -8,6 +8,9 @@ import time
 import tornado, tornado.web, tornado.websocket
 import traceback
 from bot_settings import Settings
+from bot_events import init_log
+
+log = init_log("ROSBOARD")
 
 if os.environ.get("ROS_VERSION") == "1":
     import rospy # ROS1_top
@@ -138,7 +141,7 @@ class ROSBoardNode(object):
             if len(topic_info):
                 return topic_info[0].qos_profile
             else:
-                rospy.logwarn(f"No publishers available for topic {topic_name}. Returning sensor data QoS")
+                log.warn(f"No publishers available for topic {topic_name}. Returning sensor data QoS")
                 return QoSProfile(
                         depth=10,
                         reliability=QoSReliabilityPolicy.BEST_EFFORT,
