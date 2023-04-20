@@ -3,6 +3,10 @@ import io
 import numpy as np
 from rosboard.cv_bridge import imgmsg_to_cv2
 
+from bot_events import init_log
+
+log = init_log("ROSBOARD")
+
 try:
     import simplejpeg
 except ImportError:
@@ -238,6 +242,8 @@ DATATYPE_MAPPING_PCL2_NUMPY = {
 }
 
 def compress_point_cloud2(msg, output):
+    """Safely compress a point cloud message, continues if an exception is encountered
+    """
     # assuming fields are ('x', 'y', 'z', ...),
     # compression scheme is:
     # msg['_data_uint16'] = {
@@ -279,6 +285,16 @@ def compress_point_cloud2(msg, output):
         idx = np.random.randint(points.size, size=65536)
         points = points[idx]
 
+    try:
+        perform_point_cloud_compression(points, field_names, output)
+            
+    except Exception as e:
+        log.error(f"Error compressing PointCloud2d:\n{str(e)}")
+        output["_error"] = str(e)
+
+def perform_point_cloud_compression(points, field_names, output):
+    """Compress a point cloud message
+    """
     xpoints = points['x'].astype(np.float32)
     xmax = np.max(xpoints)
     xmin = np.min(xpoints)
@@ -316,7 +332,6 @@ def compress_point_cloud2(msg, output):
         "bounds": list(map(float, bounds_uint16)),
         "points": base64.b64encode(points_uint16).decode(),
     }
-
 
 def compress_laser_scan(msg, output):
     # compression scheme:

@@ -8,11 +8,15 @@ import time
 import tornado, tornado.web, tornado.websocket
 import traceback
 from bot_settings import Settings
+from bot_events import init_log
+
+log = init_log("ROSBOARD")
 
 if os.environ.get("ROS_VERSION") == "1":
     import rospy # ROS1_top
 elif os.environ.get("ROS_VERSION") == "2":
     import rosboard.rospy2 as rospy # ROS2
+    from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 else:
     print("ROS not detected. Please source your ROS environment\n(e.g. 'source /opt/ros/DISTRO/setup.bash')")
     exit(1)
@@ -125,6 +129,29 @@ class ROSBoardNode(object):
             rospy.logerr(str(e))
             return None
 
+    def get_topic_qos(self, topic_name: str) -> QoSProfile:
+        """! 
+        Given a topic name, get the QoS profile with which it is being published
+        @param topic_name (str) the topic name
+        @return QosProfile the qos profile with which the topic is published. If no publishers exist 
+        for the given topic, it returns the sensor data QoS. returns None in case ROS1 is being used
+        """
+        if rospy.__name__ == "rospy2":
+            topic_info = rospy._node.get_publishers_info_by_topic(topic_name=topic_name)
+            if len(topic_info):
+                return topic_info[0].qos_profile
+            else:
+                log.warn(f"No publishers available for topic {topic_name}. Returning sensor data QoS")
+                return QoSProfile(
+                        depth=10,
+                        reliability=QoSReliabilityPolicy.BEST_EFFORT,
+                        durability=QoSDurabilityPolicy.VOLATILE,
+                    )
+        else:
+            rospy.logwarn("QoS profiles are only used in ROS2")
+            return None
+
+
     def pingpong_loop(self):
         """
         Loop to send pings to all active sockets every 5 seconds.
@@ -203,7 +230,7 @@ class ROSBoardNode(object):
                     continue
 
                 # if the local subscriber doesn't exist for the remote sub, create it
-                if topic_name not in self.local_subs:
+                if topic_name not in self.local_subs and topic_name in self.all_topics:
                     topic_type = self.all_topics[topic_name]
                     msg_class = self.get_msg_class(topic_type)
 
@@ -228,12 +255,19 @@ class ROSBoardNode(object):
                     self.last_data_times_by_topic[topic_name] = 0.0
 
                     rospy.loginfo("Subscribing to %s" % topic_name)
-
+                    
+                    kwargs = {}
+                    if rospy.__name__ == "rospy2":
+                        # In ros2 we also can pass QoS parameters to the subscriber.
+                        # To avoid incompatibilities we subscribe using the same Qos
+                        # of the topic's publishers
+                        kwargs = {"qos": self.get_topic_qos(topic_name)}
                     self.local_subs[topic_name] = rospy.Subscriber(
                         topic_name,
                         self.get_msg_class(topic_type),
                         self.on_ros_msg,
                         callback_args = (topic_name, topic_type),
+                        **kwargs
                     )
 
             # clean up local subscribers for which remote clients have lost interest
@@ -325,20 +359,24 @@ class ROSBoardNode(object):
 
         # convert ROS message into a dict and get it ready for serialization
         ros_msg_dict = ros2dict(msg)
+        
+        if "_error" not in ros_msg_dict:
+            # add metadata
+            ros_msg_dict["_topic_name"] = topic_name
+            ros_msg_dict["_topic_type"] = topic_type
+            ros_msg_dict["_time"] = t * 1000
 
-        # add metadata
-        ros_msg_dict["_topic_name"] = topic_name
-        ros_msg_dict["_topic_type"] = topic_type
-        ros_msg_dict["_time"] = t * 1000
+            # log last time we received data on this topic
+            self.last_data_times_by_topic[topic_name] = t
 
-        # log last time we received data on this topic
-        self.last_data_times_by_topic[topic_name] = t
+            # broadcast it to the listeners that care    
+            self.event_loop.add_callback(
+                ROSBoardSocketHandler.broadcast,
+                [ROSBoardSocketHandler.MSG_MSG, ros_msg_dict]
+            )
+        else:
+            rospy.logerr(ros_msg_dict["_error"])
 
-        # broadcast it to the listeners that care    
-        self.event_loop.add_callback(
-            ROSBoardSocketHandler.broadcast,
-            [ROSBoardSocketHandler.MSG_MSG, ros_msg_dict]
-        )
 
 def main(args=None):
     ROSBoardNode().start()
