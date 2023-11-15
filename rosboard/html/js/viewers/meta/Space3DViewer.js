@@ -11,33 +11,14 @@ class Space3DViewer extends Viewer {
     * Gets called when Viewer is first initialized.
     * @override
   **/
+  
   onCreate() {
-    // silly css nested div hell to force 100% width
-    // but keep 1:1 aspect ratio
-
-    this.wrapper = $('<div></div>')
-      .css({
-        "position": "relative",
-        "width": "100%",
-      })
-      .appendTo(this.card.content);
-
-    this.wrapper2 = $('<div></div>')
-      .css({
-        "width": "100%",
-        "height": "0",
-        "padding-bottom": "100%",
-        "background": "#303035",
-        "position": "relative",
-        "overflow": "hidden",
-      })
-      .appendTo(this.wrapper);
-
     let that = this;
 
-    this.gl = GL.create({ version:1, width: 800, height: 500});
-	  this.wrapper2[0].appendChild(this.gl.canvas);
+    this.gl = GL.create({ version:1 });
+	  $(this.gl.canvas).appendTo($(this.card.content))
     $(this.gl.canvas).css("width", "100%");
+    $(this.gl.canvas).css("height", "100%");
 	  this.gl.animate(); // launch loop
 
 	this.cam_pos = [0,100,100];
@@ -185,6 +166,24 @@ class Space3DViewer extends Viewer {
     this.gl.clearColor(0.1,0.1,0.1,1);
     this.gl.disable( this.gl.DEPTH_TEST );
 
+    this.resizeCanvasToDisplaySize = (canvas) => {
+      // If the canvas size does not match the size of the <body>,
+      // the canvas draw buffer size and display size will be updated to match it.
+
+      const bodyWidth = document.body.clientWidth;
+      const bodyHeight = document.body.clientHeight;
+
+      // Check if the canvas is not the same size.
+      const needResize = canvas.width  !== bodyWidth ||
+                         canvas.height !== bodyHeight;
+      
+      if (needResize) {
+        // Make the canvas the same size
+        canvas.width  = bodyWidth;
+        canvas.height = bodyHeight;
+      }     
+    }
+
     //rendering loop
     this.gl.ondraw = function() {
       that.gl.clear( that.gl.COLOR_BUFFER_BIT | that.gl.DEPTH_BUFFER_BIT );
@@ -297,6 +296,8 @@ class Space3DViewer extends Viewer {
           colors[4*j+3] = 1;
         }
         let points = drawObject.data;
+        this.resizeCanvasToDisplaySize(this.gl.canvas);
+        gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
         drawObjectsGl.push({type: "points", mesh: GL.Mesh.load({vertices: points, colors: colors}, null, null, this.gl)});
       }
     }
