@@ -56,11 +56,6 @@ class Space3DViewer extends Viewer {
               that.cam_offset_x += e.deltax/1000 * Math.sin(that.cam_theta) * that.cam_r;
               that.cam_offset_y -= e.deltay/1000 * Math.sin(that.cam_theta) * that.cam_r;
               that.updatePerspective();
-            } else if (e.rightButton) {
-              // Right click to rotate camera around z-axisw
-
-              // Get quadrant of mouse drag start location
-              console.log(e)
             }
           }
           else if(e.rightButton) {
