@@ -6,43 +6,31 @@
 // message decoding functionality. Child classes that inherit from Space3DViewer
 // should decode a message and instruct the plotting framework what to do.
 
+// TODO: - Either support both touch and mouse to interact, or make it a URL parameter
+// const INPUT_MODE = "touch"; 
+const INPUT_MODE = "mouse";
+
+// TODO: - Set camera mode via a URL parameter
+const CAMERA_MODE = "birds-eye";
+
 class Space3DViewer extends Viewer {
   /**
     * Gets called when Viewer is first initialized.
     * @override
   **/
+  
   onCreate() {
-    // silly css nested div hell to force 100% width
-    // but keep 1:1 aspect ratio
-
-    this.wrapper = $('<div></div>')
-      .css({
-        "position": "relative",
-        "width": "100%",
-      })
-      .appendTo(this.card.content);
-
-    this.wrapper2 = $('<div></div>')
-      .css({
-        "width": "100%",
-        "height": "0",
-        "padding-bottom": "100%",
-        "background": "#303035",
-        "position": "relative",
-        "overflow": "hidden",
-      })
-      .appendTo(this.wrapper);
-
     let that = this;
 
-    this.gl = GL.create({ version:1, width: 800, height: 500});
-	  this.wrapper2[0].appendChild(this.gl.canvas);
+    this.gl = GL.create({ version:1 });
+	  $(this.gl.canvas).appendTo($(this.card.content))
     $(this.gl.canvas).css("width", "100%");
+    $(this.gl.canvas).css("height", "100%");
 	  this.gl.animate(); // launch loop
 
-	this.cam_pos = [0,100,100];
+	  this.cam_pos = [0,0,0];
     this.cam_theta = -1.5707;
-    this.cam_phi = 1.0;
+    this.cam_phi = 0.0001;
     this.cam_r = 50.0;
     this.cam_offset_x = 0.0;
     this.cam_offset_y = 0.0;
@@ -56,88 +44,102 @@ class Space3DViewer extends Viewer {
     this.model = mat4.create();
     this.mvp = mat4.create();
     this.temp = mat4.create();
-    
-    // this.gl.captureMouse(true, true);
-		this.gl.onmouse = function(e) {
-			if(e.dragging) {
-        if(e.rightButton) {
-          that.cam_offset_x += e.deltax/30 * Math.sin(that.cam_theta);
-          that.cam_offset_y -= e.deltax/30 * Math.cos(that.cam_theta);
-          that.cam_offset_z += e.deltay/30;
-          that.updatePerspective();
-        } else {
-          if(Math.abs(e.deltax) > 100 || Math.abs(e.deltay) > 100) return;
-          that.cam_theta -= e.deltax / 300;
-          that.cam_phi -= e.deltay / 300;
+
+    if (INPUT_MODE === "mouse") {
+      this.gl.captureMouse(true, true);
+      this.gl.onmouse = function(e) {
+        if(e.dragging) {
+          // Controls for birds-eye mode
+          if(CAMERA_MODE === "birds-eye") {
+            if (e.leftButton) {
+              // Left click to pan
+              that.cam_offset_x += e.deltax/1000 * Math.sin(that.cam_theta) * that.cam_r;
+              that.cam_offset_y -= e.deltay/1000 * Math.sin(that.cam_theta) * that.cam_r;
+              that.updatePerspective();
+            }
+          }
+          else if(e.rightButton) {
+            that.cam_offset_x += e.deltax/30 * Math.sin(that.cam_theta);
+            that.cam_offset_y -= e.deltax/30 * Math.cos(that.cam_theta);
+            that.cam_offset_z += e.deltay/30;
+            that.updatePerspective();
+          } else {
+            if(Math.abs(e.deltax) > 100 || Math.abs(e.deltay) > 100) return;
+            that.cam_theta -= e.deltax / 300;
+            that.cam_phi -= e.deltay / 300;
+
+            // avoid euler singularities
+            // also don't let the user flip the entire cloud around
+            if(that.cam_phi < 0) {
+              that.cam_phi = 0.001;
+            }
+            if(that.cam_phi > Math.PI) {
+              that.cam_phi = Math.PI - 0.001;
+            }
+            that.updatePerspective();
+          }
+        }
+      }
+
+      this.gl.onmousewheel = function(e) {
+        that.cam_r -= e.delta;
+        if(that.cam_r < 1.0) that.cam_r = 1.0;
+        if(that.cam_r > 1000.0) that.cam_r = 1000.0;
+        that.updatePerspective();
+      }
+    }
+    else if (INPUT_MODE === "touch") {
+      var touchRegion = ZingTouch.Region(this.gl.canvas)
+
+      // One finger drag to rotate
+      var rotateGesture = new ZingTouch.Pan({
+        numInputs: 1
+      })
+      touchRegion.register('rotateGesture', rotateGesture)
+
+      touchRegion.bind(this.gl.canvas, 'rotateGesture', (e) => {
+        if (e.detail.data[0]) {
+          const change = e.detail.data[0].change;
+          if (Math.abs(change.x) > 100 || Math.abs(change.y) > 100) return;
+          that.cam_theta -= change.x / 300;
+          that.cam_phi -= change.y / 300;
 
           // avoid euler singularities
           // also don't let the user flip the entire cloud around
-          if(that.cam_phi < 0) {
+          if (that.cam_phi < 0) {
             that.cam_phi = 0.001;
           }
-          if(that.cam_phi > Math.PI) {
+          if (that.cam_phi > Math.PI) {
             that.cam_phi = Math.PI - 0.001;
           }
           that.updatePerspective();
         }
-			}
-		}
+      })
 
-    this.gl.onmousewheel = function(e) {
-      that.cam_r -= e.delta;
-      if(that.cam_r < 1.0) that.cam_r = 1.0;
-      if(that.cam_r > 1000.0) that.cam_r = 1000.0;
-      that.updatePerspective();
+      // Two fingers to pan the view
+      var panGesture = new ZingTouch.Pan({
+        numInputs: 2
+      })
+      touchRegion.register('panGesture', panGesture)
+      touchRegion.bind(this.gl.canvas, 'panGesture', (e) => {
+        if (e.detail.data[0]) {
+          that.cam_offset_x += e.detail.data[0].change.x / 30 * Math.sin(that.cam_theta);
+          that.cam_offset_y -= e.detail.data[0].change.x / 30 * Math.cos(that.cam_theta);
+          that.cam_offset_z += e.detail.data[0].change.y / 30;
+          that.updatePerspective();
+        }
+      })
+
+      // Pinch to zoom in or out
+      touchRegion.bind(this.gl.canvas, 'distance', (e) => {
+        that.cam_r -= e.detail.change / 5;
+        if (that.cam_r < 1.0) that.cam_r = 1.0;
+        if (that.cam_r > 1000.0) that.cam_r = 1000.0;
+        that.updatePerspective();
+      })
+    } else {
+      console.log("Input mode " + INPUT_MODE + " unknown, should be either mouse or touch");
     }
-
-    var touchRegion = ZingTouch.Region(this.gl.canvas)
-
-    // One finger drag to rotate
-    var rotateGesture = new ZingTouch.Pan({
-      numInputs: 1
-    })
-    touchRegion.register('rotateGesture', rotateGesture)
-
-    touchRegion.bind(this.gl.canvas, 'rotateGesture', (e) => {
-      if (e.detail.data[0]) {
-        const change = e.detail.data[0].change;
-        if (Math.abs(change.x) > 100 || Math.abs(change.y) > 100) return;
-        that.cam_theta -= change.x / 300;
-        that.cam_phi -= change.y / 300;
-
-        // avoid euler singularities
-        // also don't let the user flip the entire cloud around
-        if (that.cam_phi < 0) {
-          that.cam_phi = 0.001;
-        }
-        if (that.cam_phi > Math.PI) {
-          that.cam_phi = Math.PI - 0.001;
-        }
-        that.updatePerspective();
-      }
-    })
-
-    // Two fingers to pan the view
-    var panGesture = new ZingTouch.Pan({
-      numInputs: 2
-    })
-    touchRegion.register('panGesture', panGesture)
-    touchRegion.bind(this.gl.canvas, 'panGesture', (e) => {
-      if (e.detail.data[0]) {
-        that.cam_offset_x += e.detail.data[0].change.x / 30 * Math.sin(that.cam_theta);
-        that.cam_offset_y -= e.detail.data[0].change.x / 30 * Math.cos(that.cam_theta);
-        that.cam_offset_z += e.detail.data[0].change.y / 30;
-        that.updatePerspective();
-      }
-    })
-
-    // Pinch to zoom in or out
-    touchRegion.bind(this.gl.canvas, 'distance', (e) => {
-      that.cam_r -= e.detail.change / 5;
-      if (that.cam_r < 1.0) that.cam_r = 1.0;
-      if (that.cam_r > 1000.0) that.cam_r = 1000.0;
-      that.updatePerspective();
-    })
 
     this.updatePerspective = () => {
       that.cam_pos[0] = that.cam_offset_x + that.cam_r * Math.sin(that.cam_phi) * Math.cos(that.cam_theta);
@@ -184,6 +186,24 @@ class Space3DViewer extends Viewer {
     //generic gl flags and settings
     this.gl.clearColor(0.1,0.1,0.1,1);
     this.gl.disable( this.gl.DEPTH_TEST );
+
+    this.resizeCanvasToDisplaySize = (canvas) => {
+      // If the canvas size does not match the size of the <body>,
+      // the canvas draw buffer size and display size will be updated to match it.
+      const bodyWidth = document.body.clientWidth;
+      const bodyHeight = document.body.clientHeight;
+
+      // Check if the canvas is not the same size.
+      const needResize = canvas.width  !== bodyWidth ||
+                         canvas.height !== bodyHeight;
+      
+      if (needResize) {
+        // Make the canvas the same size
+        canvas.width  = bodyWidth;
+        canvas.height = bodyHeight;
+        that.updatePerspective()
+      }
+    }
 
     //rendering loop
     this.gl.ondraw = function() {
@@ -297,6 +317,8 @@ class Space3DViewer extends Viewer {
           colors[4*j+3] = 1;
         }
         let points = drawObject.data;
+        this.resizeCanvasToDisplaySize(this.gl.canvas);
+        gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
         drawObjectsGl.push({type: "points", mesh: GL.Mesh.load({vertices: points, colors: colors}, null, null, this.gl)});
       }
     }
