@@ -86,7 +86,6 @@ ImageViewer.friendlyName = "Image";
 ImageViewer.supportedTypes = [
     "sensor_msgs/msg/Image",
     "sensor_msgs/msg/CompressedImage",
-    "nav_msgs/msg/OccupancyGrid",
 ];
 
 ImageViewer.maxUpdateRate = 60.0;
