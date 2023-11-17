@@ -1,6 +1,5 @@
 "use strict";
 
-importJsOnce("js/three.js");
 importJsOnce("js/viewers/meta/Viewer.js");
 importJsOnce("js/viewers/meta/Space2DViewer.js");
 importJsOnce("js/viewers/meta/Space3DViewer.js");

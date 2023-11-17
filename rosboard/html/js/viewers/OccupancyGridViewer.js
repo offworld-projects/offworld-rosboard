@@ -1,5 +1,6 @@
 "use strict";
 
+
 class OccupancyGridViewer extends Viewer {
     /**
     * Gets called when Viewer is first initialized.
@@ -8,31 +9,30 @@ class OccupancyGridViewer extends Viewer {
     onCreate() {
         super.onCreate();
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera( 75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000 );
+        this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
-        this.camera.position.z = 5;
-        this.currentMesh = null;
-        
-        const geometry = new THREE.BoxGeometry( 1, 1, 1 );
-        const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-        const cube = new THREE.Mesh( geometry, material ); 
-        this.scene.add( cube );
-        this.camera.position.z = 5;
+        this.camera.position.set(0, 0, 10);
+        this.camera.lookAt(0, 0, 0);
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+        this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+        this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;;
 
-        const animate = () => { 
-            requestAnimationFrame( animate );
+        this.controls.touches.ONE = THREE.TOUCH.PAN;
+        this.controls.touches.TWO = THREE.TOUCH.DOLLY;
+
+        const animate = () => {
+            requestAnimationFrame(animate);
             // If the canvas size does not match the size of the <body>,
             // the canvas draw buffer size and display size will be updated to match it.
             const bodyWidth = document.body.clientWidth;
             const bodyHeight = document.body.clientHeight;
 
-            cube.rotation.x += 0.01;
-            cube.rotation.y += 0.01;
-        
             this.renderer.setSize(bodyWidth, bodyHeight);
             this.camera.aspect = bodyWidth / bodyHeight;
             this.camera.updateProjectionMatrix();
+            this.controls.update();
             this.renderer.render(this.scene, this.camera);
         }
 
@@ -42,17 +42,14 @@ class OccupancyGridViewer extends Viewer {
 
 
     onData(msg) {
-        var texture = new THREE.TextureLoader().load("data:image/jpeg;base64," + msg._data_jpeg);
-        var material = new THREE.MeshBasicMaterial({ map: texture });
-        var geometry = new THREE.PlaneGeometry(20, 20);
-        var mesh = new THREE.Mesh(geometry, material);
-        
-        if(this.currentMesh != null) {
-            this.scene.remove(this.currentMesh);
-        }
-        this.currentMesh = mesh;
-        this.scene.remove()
-        this.scene.add(this.currentMesh);
+        const base64ImageData = msg._data_jpeg;
+        let texture = new THREE.TextureLoader().load("data:image/jpeg;base64," + base64ImageData);
+        let material = new THREE.MeshBasicMaterial({ map: texture });
+        let width = 1
+        let height = msg.info.height / msg.info.width;
+        let geometry = new THREE.PlaneGeometry(1, 1);
+        let mesh = new THREE.Mesh(geometry, material);
+        this.scene.add(mesh);
         this.renderer.render(this.scene, this.camera);
     }
 }
