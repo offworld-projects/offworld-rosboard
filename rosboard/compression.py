@@ -2,6 +2,7 @@ import base64
 import io
 import numpy as np
 from rosboard.cv_bridge import imgmsg_to_cv2
+import cv2
 
 from bot_events import init_log
 
@@ -214,13 +215,22 @@ def compress_occupancy_grid(msg, output):
     try:
         occupancy_map = np.array(msg.data, dtype=np.uint16).reshape(msg.info.height, msg.info.width)[::-1,:]
 
-        while occupancy_map.shape[0] > 800 or occupancy_map.shape[1] > 800:
-            occupancy_map = occupancy_map[::2,::2]
+        # while occupancy_map.shape[0] > 800 or occupancy_map.shape[1] > 800:
+        #     occupancy_map = occupancy_map[::2,::2]
 
         cv2_img = ((100 - occupancy_map) * 10 // 4).astype(np.uint8) # *10//4 is int approx to *255.0/100.0
         cv2_img = np.stack((cv2_img,)*3, axis = -1) # greyscale to rgb
-        cv2_img[occupancy_map < 0] = [255, 127, 0]
-        cv2_img[occupancy_map > 100] = [18, 18, 18]
+        # cv2_img[occupancy_map < 0] = [255, 127, 0]
+        # cv2_img[occupancy_map > 100] = [255, 0, 0]
+        # cv2_img = ~cv2_img # invert image
+        # cv2_img = cv2.applyColorMap(cv2_img, cv2.COLORMAP_TURBO)
+        
+        for (x, y), pixel in np.ndenumerate(occupancy_map):
+            if pixel <= 98:
+                cv2_img[x][y] = [pixel, 0, 255 - (255 * pixel / 100)]
+        cv2_img[occupancy_map == 0] = [0, 0, 0]
+        cv2_img[occupancy_map == 99] = [0, 255, 255]
+        cv2_img[occupancy_map == 100] = [255, 0, 255]
 
     except Exception as e:
         output["_error"] = str(e)
