@@ -12,12 +12,12 @@ class OccupancyGridViewer extends Viewer {
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
-        this.camera.position.set(0, 0, 10);
+        this.camera.position.set(0, 0, 100);
         this.camera.lookAt(0, 0, 0);
         this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
         this.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
         this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
-        this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;;
+        this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
 
         this.controls.touches.ONE = THREE.TOUCH.PAN;
         this.controls.touches.TWO = THREE.TOUCH.DOLLY;
@@ -44,10 +44,10 @@ class OccupancyGridViewer extends Viewer {
     onData(msg) {
         const base64ImageData = msg._data_jpeg;
         let texture = new THREE.TextureLoader().load("data:image/jpeg;base64," + base64ImageData);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter; 
         let material = new THREE.MeshBasicMaterial({ map: texture });
-        let width = 1
-        let height = msg.info.height / msg.info.width;
-        let geometry = new THREE.PlaneGeometry(1, 1);
+        let geometry = new THREE.PlaneGeometry(msg.info.width, msg.info.height);
         let mesh = new THREE.Mesh(geometry, material);
         this.scene.add(mesh);
         this.renderer.render(this.scene, this.camera);
