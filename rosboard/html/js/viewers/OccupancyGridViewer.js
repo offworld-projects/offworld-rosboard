@@ -22,6 +22,7 @@ class OccupancyGridViewer extends Viewer {
 
         this.controls.touches.ONE = THREE.TOUCH.PAN;
         this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+        this.gridMesh = null;
 
         const animate = () => {
             requestAnimationFrame(animate);
@@ -43,15 +44,28 @@ class OccupancyGridViewer extends Viewer {
 
 
     onData(msg) {
+        // When a new texture arrives, we'll clean up the old geometry and texture
+        if(this.gridMesh != null && this.gridMesh.geometry != null) { this.gridMesh.geometry.dispose(); }
+        if(this.gridMesh != null && this.gridMesh.material != null) { this.gridMesh.material.dispose(); }
+
+        // Create a PlaneGeometry with the occupancy map image as its texture
         const base64ImageData = msg._data_jpeg;
         let texture = new THREE.TextureLoader().load("data:image/jpeg;base64," + base64ImageData);
         texture.magFilter = THREE.NearestFilter;
         texture.minFilter = THREE.NearestFilter; 
         let material = new THREE.MeshBasicMaterial({ map: texture });
         let geometry = new THREE.PlaneGeometry(msg.info.width, msg.info.height);
-        let mesh = new THREE.Mesh(geometry, material);
-        this.scene.add(mesh);
-        this.renderer.render(this.scene, this.camera);
+
+        // If not already present, add the mesh to the scene
+        if(this.gridMesh == null) {
+            this.gridMesh = new THREE.Mesh(geometry, material);
+            this.scene.add(this.gridMesh);
+        }
+        
+        this.gridMesh.geometry = geometry;
+        this.gridMesh.material = material;
+        this.gridMesh.updateMatrix();
+        this.gridMesh.needsUpdate = true;
     }
 }
 
