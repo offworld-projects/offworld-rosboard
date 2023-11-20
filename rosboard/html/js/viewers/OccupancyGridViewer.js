@@ -20,7 +20,7 @@ class OccupancyGridViewer extends Viewer {
         this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
 
         this.controls.touches.ONE = THREE.TOUCH.PAN;
-        this.controls.touches.TWO = THREE.TOUCH.DOLLY;
+        this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
 
         const animate = () => {
             requestAnimationFrame(animate);
