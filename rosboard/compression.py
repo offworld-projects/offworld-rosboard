@@ -220,18 +220,19 @@ def compress_occupancy_grid(msg, output):
 
         cv2_img = ((100 - occupancy_map) * 10 // 4).astype(np.uint8) # *10//4 is int approx to *255.0/100.0
         cv2_img = np.stack((cv2_img,)*3, axis = -1) # greyscale to rgb
+        
+        # Default colorscheme
         # cv2_img[occupancy_map < 0] = [255, 127, 0]
         # cv2_img[occupancy_map > 100] = [255, 0, 0]
-        # cv2_img = ~cv2_img # invert image
-        # cv2_img = cv2.applyColorMap(cv2_img, cv2.COLORMAP_TURBO)
         
+        # RVIZ costmap color scheme
         for (x, y), pixel in np.ndenumerate(occupancy_map):
             if pixel <= 98:
                 cv2_img[x][y] = [pixel, 0, 255 - (255 * pixel / 100)]
-        cv2_img[occupancy_map == 0] = [0, 0, 0]
+        cv2_img[occupancy_map == 0] = [30, 30, 30]
         cv2_img[occupancy_map == 99] = [0, 255, 255]
         cv2_img[occupancy_map == 100] = [255, 0, 255]
-
+        
     except Exception as e:
         output["_error"] = str(e)
     try:

@@ -9,6 +9,7 @@ class OccupancyGridViewer extends Viewer {
     onCreate() {
         super.onCreate();
         this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color("#181818");
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
