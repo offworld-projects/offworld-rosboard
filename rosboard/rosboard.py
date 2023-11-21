@@ -67,6 +67,10 @@ class ROSBoardNode(object):
             'debug': True, 
             'static_path': os.path.join(os.path.dirname(os.path.realpath(__file__)), 'html')
         }
+        
+        # If not in debug mode, don't print requests to stdout/HMI event logger
+        if not Settings.get('debug_mode'):
+            tornado_settings['log_function'] = lambda x: None
 
         tornado_handlers = [
                 (r"/rosboard/v1", ROSBoardSocketHandler, {

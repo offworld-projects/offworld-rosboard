@@ -15,6 +15,9 @@ class OccupancyGridViewer extends Viewer {
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
         this.camera.position.set(0, 0, 100);
         this.camera.lookAt(0, 0, 0);
+        this.raycaster = new THREE.Raycaster();
+        this.pointer = new THREE.Vector2();
+
         this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
         this.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
         this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
@@ -23,6 +26,43 @@ class OccupancyGridViewer extends Viewer {
         this.controls.touches.ONE = THREE.TOUCH.PAN;
         this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
         this.gridMesh = null;
+        this.mouseDownX, this.mouseDownY;
+        this.mapFrame;
+
+        // Invisible plane to intersect with the raycaster
+        const planeZ = 0;
+
+        const onMouseDown = (event) => {
+            // Later used to determine if the mouse has moved since the mouse down event
+            this.mouseDownX = event.clientX;
+            this.mouseDownY = event.clientY;
+        }
+
+
+        const onMouseUp = (event) => {
+            // Make sure that the mouse has not moved since the mouse down event
+            // If it did, the user is probably just dragging the screen around to pan the map, so we won't send an event
+            if (this.mouseDownX == event.clientX && this.mouseDownY == event.clientY) {
+                // Calculate normalized device coordinates (NDC) from mouse coordinates
+                this.pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+                this.pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                // Update the raycaster's origin and direction based on the camera and mouse
+                this.raycaster.setFromCamera(this.pointer, this.camera);
+
+                // Intersect the ray with the imaginary plane at the desired Z-coordinate
+                var intersectionPoint = new THREE.Vector3();
+                this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), planeZ), intersectionPoint);
+
+                // Convert threejs coordinates to map frame coordinates
+                const mapFramePoint = { x: intersectionPoint.x * this.map_resolution, y: intersectionPoint.y * this.map_resolution };
+
+                // Send event to parent DOM object
+                if (mapFramePoint != null && this.mapFrame != null) {
+                    window.parent.postMessage({ goal: mapFramePoint, frame: this.mapFrame }, '*');
+                }
+            }
+        }
 
         const animate = () => {
             requestAnimationFrame(animate);
@@ -38,6 +78,9 @@ class OccupancyGridViewer extends Viewer {
             this.renderer.render(this.scene, this.camera);
         }
 
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mouseup', onMouseUp);
+
         $(this.renderer.domElement).appendTo(this.card.content);
         animate();
     }
@@ -45,27 +88,29 @@ class OccupancyGridViewer extends Viewer {
 
     onData(msg) {
         // When a new texture arrives, we'll clean up the old geometry and texture
-        if(this.gridMesh != null && this.gridMesh.geometry != null) { this.gridMesh.geometry.dispose(); }
-        if(this.gridMesh != null && this.gridMesh.material != null) { this.gridMesh.material.dispose(); }
+        if (this.gridMesh != null && this.gridMesh.geometry != null) { this.gridMesh.geometry.dispose(); }
+        if (this.gridMesh != null && this.gridMesh.material != null) { this.gridMesh.material.dispose(); }
 
         // Create a PlaneGeometry with the occupancy map image as its texture
         const base64ImageData = msg._data_jpeg;
         let texture = new THREE.TextureLoader().load("data:image/jpeg;base64," + base64ImageData);
         texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter; 
+        texture.minFilter = THREE.NearestFilter;
         let material = new THREE.MeshBasicMaterial({ map: texture });
         let geometry = new THREE.PlaneGeometry(msg.info.width, msg.info.height);
 
         // If not already present, add the mesh to the scene
-        if(this.gridMesh == null) {
+        if (this.gridMesh == null) {
             this.gridMesh = new THREE.Mesh(geometry, material);
             this.scene.add(this.gridMesh);
         }
-        
+
         this.gridMesh.geometry = geometry;
         this.gridMesh.material = material;
         this.gridMesh.updateMatrix();
         this.gridMesh.needsUpdate = true;
+        this.map_resolution = msg.info.resolution;
+        this.mapFrame = msg.header.frame_id;
     }
 }
 
