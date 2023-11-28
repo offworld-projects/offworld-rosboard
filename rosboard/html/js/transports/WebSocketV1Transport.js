@@ -58,7 +58,13 @@ class WebSocketV1Transport {
     }
   
     subscribe({topicName, maxUpdateRate = 0.5}) {
-      this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_SUB, {topicName: topicName, maxUpdateRate: maxUpdateRate}]));
+      // Wait for websocket to be OPEN before sending subscription request
+      let waitConnection = setInterval(() => {
+        if(this.isConnected()) {
+          clearInterval(waitConnection);
+          this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_SUB, {topicName: topicName, maxUpdateRate: maxUpdateRate}]));
+        }
+      }, 1000);
     }
 
     unsubscribe({topicName}) {

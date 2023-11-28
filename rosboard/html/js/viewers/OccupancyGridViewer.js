@@ -11,7 +11,7 @@ class OccupancyGridViewer extends Viewer {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color("#181818");
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
-        this.renderer = new THREE.WebGLRenderer();
+        this.renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
         this.camera.position.set(0, 0, 100);
         this.camera.lookAt(0, 0, 0);
@@ -28,9 +28,25 @@ class OccupancyGridViewer extends Viewer {
         this.gridMesh = null;
         this.mouseDownX, this.mouseDownY;
         this.mapFrame;
+        this.botPositionX, this.botPositionY, this.botHeading;
+        const botIconTexture = new THREE.TextureLoader().load("icons/surveyor_position_indicator.png");
+        botIconTexture.magFilter = THREE.NearestFilter;
+        botIconTexture.minFilter = THREE.NearestFilter;
+        this.botPositionIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
+        this.botPositionIcon.position.set(0, 0, 0.1); // Make sure the icon is above the map
+        this.scene.add(this.botPositionIcon);
 
         // Invisible plane to intersect with the raycaster
         const planeZ = 0;
+
+        // Callback for HMI messages that contain the current robot position in the world
+        const onBotPositionUpdate = (event) => {
+            if(event.data != null && event.data.position != null) {
+                this.botPositionX = event.data.position.x;
+                this.botPositionY = event.data.position.y;
+                this.botHeading = -event.data.position.heading + Math.PI / 2;
+            }
+        }
 
         const onMouseDown = (event) => {
             // Later used to determine if the mouse has moved since the mouse down event
@@ -74,12 +90,20 @@ class OccupancyGridViewer extends Viewer {
             this.renderer.setSize(bodyWidth, bodyHeight);
             this.camera.aspect = bodyWidth / bodyHeight;
             this.camera.updateProjectionMatrix();
+
+            // Add surveyor position icon
+            if (this.botPositionX != null && this.botPositionY != null) {
+                this.botPositionIcon.position.set(this.botPositionX / this.map_resolution, this.botPositionY / this.map_resolution, 0.1);
+                this.botPositionIcon.rotation.z = this.botHeading;
+            }
+
             this.controls.update();
             this.renderer.render(this.scene, this.camera);
         }
 
         document.addEventListener('mousedown', onMouseDown);
         document.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('message', onBotPositionUpdate);
 
         $(this.renderer.domElement).appendTo(this.card.content);
         animate();
