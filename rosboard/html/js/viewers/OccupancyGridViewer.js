@@ -116,6 +116,7 @@ class OccupancyGridViewer extends Viewer {
 
 
     onData(msg) {
+        console.log(JSON.parse(JSON.stringify(msg)))
         // When a new texture arrives, we'll clean up the old geometry and texture
         if (this.gridMesh != null && this.gridMesh.geometry != null) { this.gridMesh.geometry.dispose(); }
         if (this.gridMesh != null && this.gridMesh.material != null) { this.gridMesh.material.dispose(); }
