@@ -8,6 +8,8 @@ from bot_events import init_log
 
 log = init_log("ROSBOARD")
 
+JPEG_QUALITY = 100
+
 try:
     import simplejpeg
 except ImportError:
@@ -38,16 +40,16 @@ def encode_jpeg(img):
             img = np.expand_dims(img, axis=2)
             if not img.flags['C_CONTIGUOUS']:
                 img = img.copy(order='C')
-            return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = 100)
+            return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = JPEG_QUALITY)
         elif len(img.shape) == 3:
             if not img.flags['C_CONTIGUOUS']:
                 img = img.copy(order='C')
             if img.shape[2] == 1:
-                return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = 100)
+                return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = JPEG_QUALITY)
             elif img.shape[2] == 4:
-                return simplejpeg.encode_jpeg(img, colorspace = "RGBA", quality = 100)
+                return simplejpeg.encode_jpeg(img, colorspace = "RGBA", quality = JPEG_QUALITY)
             elif img.shape[2] == 3:
-                return simplejpeg.encode_jpeg(img, colorspace = "RGB", quality = 100)
+                return simplejpeg.encode_jpeg(img, colorspace = "RGB", quality = JPEG_QUALITY)
         else:
             return b''
     elif cv2:
@@ -57,7 +59,7 @@ def encode_jpeg(img):
     elif PIL:
         pil_img = Image.fromarray(img)
         buffered = io.BytesIO()
-        pil_img.save(buffered, format="JPEG", quality = 100)    
+        pil_img.save(buffered, format="JPEG", quality = JPEG_QUALITY)    
         return buffered.getvalue()
 
 _PCL2_DATATYPES_NUMPY_MAP = {
