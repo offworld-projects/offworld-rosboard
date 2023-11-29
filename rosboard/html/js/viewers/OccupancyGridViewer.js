@@ -73,7 +73,7 @@ class OccupancyGridViewer extends Viewer {
 
                 // Send event to parent DOM object
                 if (mapFramePoint != null && this.mapFrame != null) {
-                    window.parent.postMessage({ goal: mapFramePoint, frame: this.mapFrame }, '*');
+                    currentTransport.sendOpRequest({op: "NAV.MOVE_TO", args: {x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame}});
                 }
             }
         }

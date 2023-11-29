@@ -10,6 +10,8 @@ import uuid
 
 from . import __version__
 
+from bot_overseer_api import OverseerAPI
+
 class ViewerHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("html/viewer.html")
@@ -25,6 +27,7 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
     def initialize(self, node):
         # store the instance of the ROS node that created this WebSocketHandler so we can access it later
         self.node = node
+        self._overseer = OverseerAPI()
 
     def get_compression_options(self):
         # Non-None enables compression with default options.
@@ -189,6 +192,17 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
                 self.node.remote_subs[topic_name].remove(self.id)
             except KeyError:
                 print("KeyError trying to remove sub")
+        
+        # client sent an op request
+        elif argv[0] == ROSBoardSocketHandler.MSG_OP:
+            if len(argv) != 2 or type(argv[1]) is not dict:
+                print("error: bad op: %s" % message)
+                return
+
+            op_name = argv[1].get("op_name")
+            args = argv[1].get("args")
+            print(op_name, args)
+            self._overseer.run_private_op(op_name, **args)
 
 ROSBoardSocketHandler.MSG_PING = "p";
 ROSBoardSocketHandler.MSG_PONG = "q";
@@ -197,6 +211,7 @@ ROSBoardSocketHandler.MSG_TOPICS = "t";
 ROSBoardSocketHandler.MSG_SUB = "s";
 ROSBoardSocketHandler.MSG_SYSTEM = "y";
 ROSBoardSocketHandler.MSG_UNSUB = "u";
+ROSBoardSocketHandler.MSG_OP = "o";
 
 ROSBoardSocketHandler.PING_SEQ = "s";
 ROSBoardSocketHandler.PONG_SEQ = "s";

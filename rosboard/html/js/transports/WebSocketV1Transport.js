@@ -70,6 +70,10 @@ class WebSocketV1Transport {
     unsubscribe({topicName}) {
       this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_UNSUB, {topicName: topicName}]));
     }
+
+    sendOpRequest({op, args}) {
+      this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_OP, {op_name: op, args: args}]));
+    }
   }
   
   WebSocketV1Transport.MSG_PING = "p";
@@ -79,6 +83,7 @@ class WebSocketV1Transport {
   WebSocketV1Transport.MSG_SUB = "s";
   WebSocketV1Transport.MSG_SYSTEM = "y";
   WebSocketV1Transport.MSG_UNSUB = "u";
+  WebSocketV1Transport.MSG_OP = "o";
 
   WebSocketV1Transport.PING_SEQ= "s";
   WebSocketV1Transport.PONG_SEQ = "s";
