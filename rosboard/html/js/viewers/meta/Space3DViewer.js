@@ -23,12 +23,12 @@ class Space3DViewer extends Viewer {
     let that = this;
 
     this.gl = GL.create({ version:1 });
-	  $(this.gl.canvas).appendTo($(this.card.content))
+    $(this.gl.canvas).appendTo($(this.card.content))
     $(this.gl.canvas).css("width", "100%");
     $(this.gl.canvas).css("height", "100%");
 	  this.gl.animate(); // launch loop
 
-	  this.cam_pos = [0,0,0];
+    this.cam_pos = [0,0,0];
     this.cam_theta = -1.5707;
     this.cam_phi = 0.0001;
     this.cam_r = 50.0;

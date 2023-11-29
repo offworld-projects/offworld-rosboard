@@ -2,10 +2,13 @@ import base64
 import io
 import numpy as np
 from rosboard.cv_bridge import imgmsg_to_cv2
+import cv2
 
 from bot_events import init_log
 
 log = init_log("ROSBOARD")
+
+JPEG_QUALITY = 100
 
 try:
     import simplejpeg
@@ -37,26 +40,26 @@ def encode_jpeg(img):
             img = np.expand_dims(img, axis=2)
             if not img.flags['C_CONTIGUOUS']:
                 img = img.copy(order='C')
-            return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = 50)
+            return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = JPEG_QUALITY)
         elif len(img.shape) == 3:
             if not img.flags['C_CONTIGUOUS']:
                 img = img.copy(order='C')
             if img.shape[2] == 1:
-                return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = 50)
+                return simplejpeg.encode_jpeg(img, colorspace = "GRAY", quality = JPEG_QUALITY)
             elif img.shape[2] == 4:
-                return simplejpeg.encode_jpeg(img, colorspace = "RGBA", quality = 50)
+                return simplejpeg.encode_jpeg(img, colorspace = "RGBA", quality = JPEG_QUALITY)
             elif img.shape[2] == 3:
-                return simplejpeg.encode_jpeg(img, colorspace = "RGB", quality = 50)
+                return simplejpeg.encode_jpeg(img, colorspace = "RGB", quality = JPEG_QUALITY)
         else:
             return b''
     elif cv2:
         if len(img.shape) == 3 and img.shape[2] == 3:
             img = img[:,:,::-1]
-        return cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 50])[1].tobytes()
+        return cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 100])[1].tobytes()
     elif PIL:
         pil_img = Image.fromarray(img)
         buffered = io.BytesIO()
-        pil_img.save(buffered, format="JPEG", quality = 50)    
+        pil_img.save(buffered, format="JPEG", quality = JPEG_QUALITY)    
         return buffered.getvalue()
 
 _PCL2_DATATYPES_NUMPY_MAP = {
@@ -214,14 +217,21 @@ def compress_occupancy_grid(msg, output):
     try:
         occupancy_map = np.array(msg.data, dtype=np.uint16).reshape(msg.info.height, msg.info.width)[::-1,:]
 
-        while occupancy_map.shape[0] > 800 or occupancy_map.shape[1] > 800:
-            occupancy_map = occupancy_map[::2,::2]
-
         cv2_img = ((100 - occupancy_map) * 10 // 4).astype(np.uint8) # *10//4 is int approx to *255.0/100.0
         cv2_img = np.stack((cv2_img,)*3, axis = -1) # greyscale to rgb
-        cv2_img[occupancy_map < 0] = [255, 127, 0]
-        cv2_img[occupancy_map > 100] = [255, 0, 0]
-
+        
+        # Default colorscheme
+        # cv2_img[occupancy_map < 0] = [255, 127, 0]
+        # cv2_img[occupancy_map > 100] = [255, 0, 0]
+        
+        # RVIZ costmap color scheme
+        for (x, y), pixel in np.ndenumerate(occupancy_map):
+            if pixel <= 98:
+                cv2_img[x][y] = [pixel, 0, 255 - (255 * pixel / 100)]
+        cv2_img[occupancy_map == 0] = [30, 30, 30]
+        cv2_img[occupancy_map == 99] = [0, 255, 255]
+        cv2_img[occupancy_map == 100] = [255, 0, 255]
+        
     except Exception as e:
         output["_error"] = str(e)
     try:

@@ -7,6 +7,9 @@ import threading
 import time
 import tornado, tornado.web, tornado.websocket
 import traceback
+
+from tf2_ros import Buffer, TransformListener
+
 from bot_settings import Settings
 from bot_events import init_log
 
@@ -67,6 +70,10 @@ class ROSBoardNode(object):
             'debug': True, 
             'static_path': os.path.join(os.path.dirname(os.path.realpath(__file__)), 'html')
         }
+        
+        # If not in debug mode, don't print requests to stdout/HMI event logger
+        if not Settings.get('debug_mode'):
+            tornado_settings['log_function'] = lambda x: None
 
         tornado_handlers = [
                 (r"/rosboard/v1", ROSBoardSocketHandler, {
@@ -78,6 +85,10 @@ class ROSBoardNode(object):
                     "default_filename": "index.html"
                 }),
         ]
+        
+        # Initialize TF listeners
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, rospy._node)
 
         self.event_loop = None
         self.tornado_application = tornado.web.Application(tornado_handlers, **tornado_settings)
@@ -368,6 +379,37 @@ class ROSBoardNode(object):
 
             # log last time we received data on this topic
             self.last_data_times_by_topic[topic_name] = t
+            
+            # If the message is one of the following types,
+            # we'll include the transform between bot base link
+            # and map frames in the msg header
+            TF_INCLUDE_TYPES = ["OccupancyGrid", "PointCloud2"]
+            for tf_type in TF_INCLUDE_TYPES:
+                if tf_type in topic_type:
+                    # Get the TF between bot base_link and map
+                    msg_frame = msg.header.frame_id
+                    bot_model = Settings.get("model").lower()
+                    base_link_frame = bot_model + "/base_link"
+                    
+                    try:
+                        tf = self.tf_buffer.lookup_transform(msg_frame, base_link_frame, rospy.Time(0))
+                        if tf is None:
+                            raise LookupError(f"No transform found between {msg_frame} and {base_link_frame}")
+
+                        ros_msg_dict["_transform"] = {}
+                        ros_msg_dict["_transform"]["position"] = {}
+                        ros_msg_dict["_transform"]["rotation"] = {}
+                        ros_msg_dict["_transform"]["position"]["x"] = tf.transform.translation.x
+                        ros_msg_dict["_transform"]["position"]["y"] = tf.transform.translation.y
+                        ros_msg_dict["_transform"]["position"]["z"] = tf.transform.translation.z
+                        ros_msg_dict["_transform"]["rotation"]["x"] = tf.transform.rotation.x
+                        ros_msg_dict["_transform"]["rotation"]["y"] = tf.transform.rotation.y
+                        ros_msg_dict["_transform"]["rotation"]["z"] = tf.transform.rotation.z
+                        ros_msg_dict["_transform"]["rotation"]["w"] = tf.transform.rotation.w
+                        
+                    except Exception as e:
+                        rospy.logwarn(str(e))
+                        ros_msg_dict["_transform"] = None
 
             # broadcast it to the listeners that care    
             self.event_loop.add_callback(

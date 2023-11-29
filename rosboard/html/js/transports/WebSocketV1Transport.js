@@ -58,11 +58,21 @@ class WebSocketV1Transport {
     }
   
     subscribe({topicName, maxUpdateRate = 0.5}) {
-      this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_SUB, {topicName: topicName, maxUpdateRate: maxUpdateRate}]));
+      // Wait for websocket to be OPEN before sending subscription request
+      let waitConnection = setInterval(() => {
+        if(this.isConnected()) {
+          clearInterval(waitConnection);
+          this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_SUB, {topicName: topicName, maxUpdateRate: maxUpdateRate}]));
+        }
+      }, 1000);
     }
 
     unsubscribe({topicName}) {
       this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_UNSUB, {topicName: topicName}]));
+    }
+
+    sendOpRequest({op, args}) {
+      this.ws.send(JSON.stringify([WebSocketV1Transport.MSG_OP, {op_name: op, args: args}]));
     }
   }
   
@@ -73,6 +83,7 @@ class WebSocketV1Transport {
   WebSocketV1Transport.MSG_SUB = "s";
   WebSocketV1Transport.MSG_SYSTEM = "y";
   WebSocketV1Transport.MSG_UNSUB = "u";
+  WebSocketV1Transport.MSG_OP = "o";
 
   WebSocketV1Transport.PING_SEQ= "s";
   WebSocketV1Transport.PONG_SEQ = "s";
