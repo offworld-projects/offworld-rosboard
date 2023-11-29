@@ -38,20 +38,13 @@ class OccupancyGridViewer extends Viewer {
         botIconTexture.magFilter = THREE.NearestFilter;
         botIconTexture.minFilter = THREE.NearestFilter;
         this.botPositionIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
-        this.botPositionIcon.position.set(0, 0, 0.1); // Make sure the icon is above the map
+        this.botPositionIcon.position.set(0, 0, 0.1); 
+        this.botPositionIcon.visible = false;
+
         this.scene.add(this.botPositionIcon);
 
         // Invisible plane to intersect with the raycaster
         const planeZ = 0;
-
-        // Callback for HMI messages that contain the current robot position in the world
-        const onBotPositionUpdate = (event) => {
-            if(event.data != null && event.data.position != null) {
-                this.botPositionX = event.data.position.x;
-                this.botPositionY = event.data.position.y;
-                this.botHeading = -event.data.position.heading + Math.PI / 2;
-            }
-        }
 
         const onMouseDown = (event) => {
             // Later used to determine if the mouse has moved since the mouse down event
@@ -98,7 +91,7 @@ class OccupancyGridViewer extends Viewer {
             // Add surveyor position icon
             if (this.botPositionX != null && this.botPositionY != null) {
                 this.botPositionIcon.position.set(this.botPositionX / this.map_resolution, this.botPositionY / this.map_resolution, 0.1);
-                this.botPositionIcon.rotation.z = this.botHeading;
+                // this.botPositionIcon.rotation.z = this.botHeading;
             }
 
             // Update threejs scene
@@ -108,15 +101,12 @@ class OccupancyGridViewer extends Viewer {
 
         document.addEventListener('mousedown', onMouseDown);
         document.addEventListener('mouseup', onMouseUp);
-        window.addEventListener('message', onBotPositionUpdate);
-
         $(this.renderer.domElement).appendTo(this.card.content);
         animate();
     }
 
 
     onData(msg) {
-        console.log(JSON.parse(JSON.stringify(msg)))
         // When a new texture arrives, we'll clean up the old geometry and texture
         if (this.gridMesh != null && this.gridMesh.geometry != null) { this.gridMesh.geometry.dispose(); }
         if (this.gridMesh != null && this.gridMesh.material != null) { this.gridMesh.material.dispose(); }
@@ -142,6 +132,18 @@ class OccupancyGridViewer extends Viewer {
         this.gridMesh.needsUpdate = true;
         this.map_resolution = msg.info.resolution;
         this.mapFrame = msg.header.frame_id;
+
+        // If TF was in the message, we'll save it to display the bot position icon
+        if (msg._transform != null) {
+            this.botPositionX = msg._transform.position.x
+            this.botPositionY = msg._transform.position.y
+            this.botPositionIcon.visible = true;
+        } else {
+            // Bot position unknown, the icon should be removed from display!
+            this.botPositionX = null;
+            this.botPositionY = null;
+            this.botPositionIcon.visible = false;
+        }
     }
 }
 

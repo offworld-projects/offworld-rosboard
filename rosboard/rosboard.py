@@ -388,11 +388,11 @@ class ROSBoardNode(object):
             for tf_type in TF_INCLUDE_TYPES:
                 if tf_type in topic_type:
                     # Get the TF between bot base_link and map
-                    MAP_FRAME = Settings.get("world_frame")
-                    BOT_BASE_LINK_FRAME = Settings.get("model").lower() + "/base_link"
+                    msg_frame = msg.header.frame_id
+                    base_link_frame = Settings.get("model").lower() + "/base_link"
                     
                     try:
-                        tf = self.tf_buffer.lookup_transform(MAP_FRAME, BOT_BASE_LINK_FRAME, rospy.Time.now(), rospy.Duration(5.0))
+                        tf = self.tf_buffer.lookup_transform(msg_frame, base_link_frame, rospy.Time.now(), rospy.Duration(0.5))
                         if tf is None:
                             raise LookupError()
 
@@ -408,8 +408,6 @@ class ROSBoardNode(object):
                         ros_msg_dict["_transform"]["rotation"]["w"] = tf.transform.rotation.w
                         
                     except Exception as e:
-                        import traceback
-                        traceback.print_exc()
                         ros_msg_dict["_transform"] = None
 
             # broadcast it to the listeners that care    
