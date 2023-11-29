@@ -38,7 +38,6 @@ class ROSBoardNode(object):
     def __init__(self, node_name = "rosboard_node"):
         self.__class__.instance = self
         rospy.init_node(node_name)
-        global _node
         self.port = rospy.get_param("~port", 8888)
 
         # desired subscriptions of all the websockets connecting to this instance.
@@ -389,12 +388,13 @@ class ROSBoardNode(object):
                 if tf_type in topic_type:
                     # Get the TF between bot base_link and map
                     msg_frame = msg.header.frame_id
-                    base_link_frame = Settings.get("model").lower() + "/base_link"
+                    bot_model = Settings.get("model").lower()
+                    base_link_frame = bot_model + "/base_link"
                     
                     try:
-                        tf = self.tf_buffer.lookup_transform(msg_frame, base_link_frame, rospy.Time.now(), rospy.Duration(0.5))
+                        tf = self.tf_buffer.lookup_transform(msg_frame, base_link_frame, rospy.Time(0))
                         if tf is None:
-                            raise LookupError()
+                            raise LookupError(f"No transform found between {msg_frame} and {base_link_frame}")
 
                         ros_msg_dict["_transform"] = {}
                         ros_msg_dict["_transform"]["position"] = {}
@@ -408,6 +408,7 @@ class ROSBoardNode(object):
                         ros_msg_dict["_transform"]["rotation"]["w"] = tf.transform.rotation.w
                         
                     except Exception as e:
+                        rospy.logwarn(str(e))
                         ros_msg_dict["_transform"] = None
 
             # broadcast it to the listeners that care    

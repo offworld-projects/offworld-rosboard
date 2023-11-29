@@ -14,7 +14,7 @@ class OccupancyGridViewer extends Viewer {
 
         // Set up the camera and renderer
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
-        this.renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
+        this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
         this.camera.position.set(0, 0, 100);
         this.camera.lookAt(0, 0, 0);
@@ -38,7 +38,7 @@ class OccupancyGridViewer extends Viewer {
         botIconTexture.magFilter = THREE.NearestFilter;
         botIconTexture.minFilter = THREE.NearestFilter;
         this.botPositionIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
-        this.botPositionIcon.position.set(0, 0, 0.1); 
+        this.botPositionIcon.position.set(0, 0, 0.1);
         this.botPositionIcon.visible = false;
 
         this.scene.add(this.botPositionIcon);
@@ -73,7 +73,7 @@ class OccupancyGridViewer extends Viewer {
 
                 // Send event to parent DOM object
                 if (mapFramePoint != null && this.mapFrame != null) {
-                    currentTransport.sendOpRequest({op: "NAV.MOVE_TO", args: {x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame}});
+                    currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
                 }
             }
         }
@@ -124,7 +124,7 @@ class OccupancyGridViewer extends Viewer {
             this.gridMesh = new THREE.Mesh(geometry, material);
             this.scene.add(this.gridMesh);
         }
-        
+
         // Update the plane geometry and material to match the new texture
         this.gridMesh.geometry = geometry;
         this.gridMesh.material = material;
