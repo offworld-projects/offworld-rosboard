@@ -8,8 +8,11 @@ class OccupancyGridViewer extends Viewer {
     **/
     onCreate() {
         super.onCreate();
+        // Set up the threejs scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color("#181818");
+
+        // Set up the camera and renderer
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
@@ -18,15 +21,17 @@ class OccupancyGridViewer extends Viewer {
         this.raycaster = new THREE.Raycaster();
         this.pointer = new THREE.Vector2();
 
+        // Set up the orbit controls
         this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
         this.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
         this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
         this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
-
         this.controls.touches.ONE = THREE.TOUCH.PAN;
         this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
-        this.gridMesh = null;
         this.mouseDownX, this.mouseDownY;
+
+        // Set up the bot position indicator icon
+        this.gridMesh = null;
         this.mapFrame;
         this.botPositionX, this.botPositionY, this.botHeading;
         const botIconTexture = new THREE.TextureLoader().load("icons/surveyor_position_indicator.png");
@@ -86,7 +91,6 @@ class OccupancyGridViewer extends Viewer {
             // the canvas draw buffer size and display size will be updated to match it.
             const bodyWidth = document.body.clientWidth;
             const bodyHeight = document.body.clientHeight;
-
             this.renderer.setSize(bodyWidth, bodyHeight);
             this.camera.aspect = bodyWidth / bodyHeight;
             this.camera.updateProjectionMatrix();
@@ -97,6 +101,7 @@ class OccupancyGridViewer extends Viewer {
                 this.botPositionIcon.rotation.z = this.botHeading;
             }
 
+            // Update threejs scene
             this.controls.update();
             this.renderer.render(this.scene, this.camera);
         }
@@ -128,7 +133,8 @@ class OccupancyGridViewer extends Viewer {
             this.gridMesh = new THREE.Mesh(geometry, material);
             this.scene.add(this.gridMesh);
         }
-
+        
+        // Update the plane geometry and material to match the new texture
         this.gridMesh.geometry = geometry;
         this.gridMesh.material = material;
         this.gridMesh.updateMatrix();
