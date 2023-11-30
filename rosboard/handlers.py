@@ -201,7 +201,7 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
 
             op_name = argv[1].get("op_name")
             args = argv[1].get("args")
-            self._overseer.run_private_op(op_name, **args)
+            self._overseer.run_op(op_name, **args)
 
 ROSBoardSocketHandler.MSG_PING = "p";
 ROSBoardSocketHandler.MSG_PONG = "q";
