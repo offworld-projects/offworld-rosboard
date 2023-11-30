@@ -1,16 +1,9 @@
-"use strict";
-
-
-class OccupancyGridViewer extends Viewer {
-    /**
-    * Gets called when Viewer is first initialized.
-    * @override
-    **/
+class OccupancyGridViewer extends Viewer { /** Gets called when Viewer is first initialized. @override **/
     onCreate() {
         super.onCreate();
         // Set up the threejs scene
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color("#181818");
+        this.scene.background = new THREE.Color("#000000");
 
         // Set up the camera and renderer
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
@@ -73,7 +66,9 @@ class OccupancyGridViewer extends Viewer {
 
                 // Send event to parent DOM object
                 if (mapFramePoint != null && this.mapFrame != null) {
-                    currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
+                    if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
+                        currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
+                    }
                 }
             }
         }
