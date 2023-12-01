@@ -1,4 +1,8 @@
-class OccupancyGridViewer extends Viewer { /** Gets called when Viewer is first initialized. @override **/
+class OccupancyGridViewer extends Viewer {
+    /**
+    * Gets called when Viewer is first initialized.
+    * @override
+    **/
     onCreate() {
         super.onCreate();
         // Set up the threejs scene
@@ -134,7 +138,7 @@ class OccupancyGridViewer extends Viewer { /** Gets called when Viewer is first 
             this.botPositionY = msg._transform.position.y
             const quaternion = messageToQuaternion(msg);
             const euler = quaternionToEuler(quaternion);
-            this.botHeading = euler.z;
+            this.botHeading = (euler.z + 180) % 360;
             this.botPositionIcon.visible = true;
         } else {
             // Bot position unknown, the icon should be removed from display!
