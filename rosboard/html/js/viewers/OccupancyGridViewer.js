@@ -1,6 +1,3 @@
-"use strict";
-
-
 class OccupancyGridViewer extends Viewer {
     /**
     * Gets called when Viewer is first initialized.
@@ -10,7 +7,7 @@ class OccupancyGridViewer extends Viewer {
         super.onCreate();
         // Set up the threejs scene
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color("#181818");
+        this.scene.background = new THREE.Color("#000000");
 
         // Set up the camera and renderer
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
@@ -73,7 +70,9 @@ class OccupancyGridViewer extends Viewer {
 
                 // Send event to parent DOM object
                 if (mapFramePoint != null && this.mapFrame != null) {
-                    currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
+                    if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
+                        currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
+                    }
                 }
             }
         }
@@ -91,7 +90,7 @@ class OccupancyGridViewer extends Viewer {
             // Add surveyor position icon
             if (this.botPositionX != null && this.botPositionY != null) {
                 this.botPositionIcon.position.set(this.botPositionX / this.map_resolution, this.botPositionY / this.map_resolution, 0.1);
-                // this.botPositionIcon.rotation.z = this.botHeading;
+                this.botPositionIcon.rotation.z = this.botHeading;
             }
 
             // Update threejs scene
@@ -137,6 +136,9 @@ class OccupancyGridViewer extends Viewer {
         if (msg._transform != null) {
             this.botPositionX = msg._transform.position.x
             this.botPositionY = msg._transform.position.y
+            const quaternion = messageToQuaternion(msg);
+            const euler = quaternionToEuler(quaternion);
+            this.botHeading = (euler.z + 180) % 360;
             this.botPositionIcon.visible = true;
         } else {
             // Bot position unknown, the icon should be removed from display!
@@ -147,6 +149,15 @@ class OccupancyGridViewer extends Viewer {
     }
 }
 
+function messageToQuaternion(message) {
+    rotation = message._transform.rotation
+    return new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+}
+
+function quaternionToEuler(quaternion) {
+    return new THREE.Euler().setFromQuaternion(quaternion);
+}
+ 
 OccupancyGridViewer.friendlyName = "OccupancyGrid";
 
 OccupancyGridViewer.supportedTypes = [
