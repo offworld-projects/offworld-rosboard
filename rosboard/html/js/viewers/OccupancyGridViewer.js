@@ -13,18 +13,14 @@ class OccupancyGridViewer extends Viewer {
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
-        this.camera.position.set(0, 0, 100);
+        this.camera.position.set(0, 100, 0);
         this.camera.lookAt(0, 0, 0);
         this.raycaster = new THREE.Raycaster();
         this.pointer = new THREE.Vector2();
 
-        // Set up the orbit controls
-        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
-        this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
-        this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
-        this.controls.touches.ONE = THREE.TOUCH.PAN;
-        this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+        // Set up the arcball controls
+        this.controls = new THREE.ArcballControls(this.camera, this.renderer.domElement, this.scene, false);
+        this.controls.setGizmosVisible(false);
         this.mouseDownX, this.mouseDownY;
 
         // Set up the bot position indicator icon
@@ -35,13 +31,17 @@ class OccupancyGridViewer extends Viewer {
         botIconTexture.magFilter = THREE.NearestFilter;
         botIconTexture.minFilter = THREE.NearestFilter;
         this.botPositionIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
-        this.botPositionIcon.position.set(0, 0, 0.1);
+        this.botPositionIcon.position.set(0, 0, 0);
+        this.botPositionIcon.rotation.x = -Math.PI / 2;
         this.botPositionIcon.visible = false;
 
         this.scene.add(this.botPositionIcon);
+        
+        const axisHelper = new THREE.AxesHelper(5);
+        this.scene.add(axisHelper);
 
         // Invisible plane to intersect with the raycaster
-        const planeZ = 0;
+        const planeY = 0;
 
         const onMouseDown = (event) => {
             // Later used to determine if the mouse has moved since the mouse down event
@@ -63,10 +63,10 @@ class OccupancyGridViewer extends Viewer {
 
                 // Intersect the ray with the imaginary plane at the desired Z-coordinate
                 var intersectionPoint = new THREE.Vector3();
-                this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), planeZ), intersectionPoint);
+                this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), planeY), intersectionPoint);
 
                 // Convert threejs coordinates to map frame coordinates
-                const mapFramePoint = { x: intersectionPoint.x * this.map_resolution, y: intersectionPoint.y * this.map_resolution };
+                const mapFramePoint = { x: intersectionPoint.x * this.map_resolution, y: -intersectionPoint.z * this.map_resolution };
 
                 // Send event to parent DOM object
                 if (mapFramePoint != null && this.mapFrame != null) {
@@ -89,9 +89,13 @@ class OccupancyGridViewer extends Viewer {
 
             // Add surveyor position icon
             if (this.botPositionX != null && this.botPositionY != null) {
-                this.botPositionIcon.position.set(this.botPositionX / this.map_resolution, this.botPositionY / this.map_resolution, 0.1);
+                this.botPositionIcon.position.set(this.botPositionX / this.map_resolution, 0.1, this.botPositionY / this.map_resolution);
                 this.botPositionIcon.rotation.z = this.botHeading;
             }
+
+            // Lock rotation to a circle around the scene Y-axis
+            this.controls.camera.rotation.x = -Math.PI / 2;
+            this.controls.camera.rotation.y = 0;
 
             // Update threejs scene
             this.controls.update();
@@ -121,6 +125,7 @@ class OccupancyGridViewer extends Viewer {
         // If not already present, add the mesh to the scene
         if (this.gridMesh == null) {
             this.gridMesh = new THREE.Mesh(geometry, material);
+            this.gridMesh.rotation.x = -Math.PI / 2;
             this.scene.add(this.gridMesh);
         }
 
@@ -140,6 +145,12 @@ class OccupancyGridViewer extends Viewer {
             const euler = quaternionToEuler(quaternion);
             this.botHeading = (euler.z + 180) % 360;
             this.botPositionIcon.visible = true;
+
+            // Since we currently only have a local costmap, we'll move the map texture to center underneath the bot's current position
+            if (this.gridMesh != null) {
+                this.gridMesh.position.x = this.botPositionX / this.map_resolution;
+                this.gridMesh.position.z = this.botPositionY / this.map_resolution;
+            }
         } else {
             // Bot position unknown, the icon should be removed from display!
             this.botPositionX = null;
@@ -157,7 +168,7 @@ function messageToQuaternion(message) {
 function quaternionToEuler(quaternion) {
     return new THREE.Euler().setFromQuaternion(quaternion);
 }
- 
+
 OccupancyGridViewer.friendlyName = "OccupancyGrid";
 
 OccupancyGridViewer.supportedTypes = [
