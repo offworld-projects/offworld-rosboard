@@ -174,7 +174,7 @@ PointCloud2Viewer.SIZEOF = {
 
 PointCloud2Viewer.friendlyName = "Point cloud (3D)";
 PointCloud2Viewer.supportedTypes = [
-    "sensor_msgs/msg/PointCloud2",
+    // "sensor_msgs/msg/PointCloud2",
 ];
 PointCloud2Viewer.maxUpdateRate = 30.0;
 Viewer.registerViewer(PointCloud2Viewer);
