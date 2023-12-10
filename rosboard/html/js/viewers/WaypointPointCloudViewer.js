@@ -31,23 +31,33 @@ class WaypointPointCloudViewer extends Viewer {
         this.mapFrame = "map";
         
         // Surveyor position indicator icon
-        this.botPositionX, this.botPositionY, this.botHeading;
+        this.surveyorPositionX, this.surveyorPositionY, this.surveyorHeading;
         const botIconTexture = new THREE.TextureLoader().load("icons/surveyor_position_indicator.png");
         botIconTexture.magFilter = THREE.NearestFilter;
         botIconTexture.minFilter = THREE.NearestFilter;
-        this.botPositionIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
-        this.botPositionIcon.position.set(0, 0, 0);
-        this.botPositionIcon.rotation.x = -Math.PI / 2;
-        this.botPositionIcon.visible = false;
+        this.surveyorIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
+        this.surveyorIcon.position.set(0, 0, 0);
+        this.surveyorIcon.rotation.x = -Math.PI / 2;
+        this.surveyorIcon.visible = false;
+        this.scene.add(this.surveyorIcon);
+
+        // Digger position indicator icon
+        this.diggerPositionX, this.diggerPositionY, this.diggerHeading;
+        botIconTexture.magFilter = THREE.NearestFilter;
+        botIconTexture.minFilter = THREE.NearestFilter;
+        this.diggerIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
+        this.diggerIcon.position.set(0, 0, 0);
+        this.diggerIcon.rotation.x = -Math.PI / 2;
+        this.diggerIcon.visible = false;
+        this.scene.add(this.diggerIcon);
+
 
         // Active waypoint icon
-        const activeBotTexture = new THREE.TextureLoader().load("icons/surveyor_position_indicator.png");
+        const activeBotTexture = new THREE.TextureLoader().load("icons/waypoint.png");
         this.activeWaypointIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true }));
         this.activeWaypointIcon.rotation.x = -Math.PI / 2;
         this.activeWaypointIcon.visible = false;
-
-        this.scene.add(this.botPositionIcon);
-
+        this.scene.add(this.activeWaypointIcon)
 
         const axisHelper = new THREE.AxesHelper(5);
         this.scene.add(axisHelper);
@@ -118,28 +128,51 @@ class WaypointPointCloudViewer extends Viewer {
 
     updateSurveyorPosition(msg) {
         if (msg != null) {
-            this.botPositionX = msg.transform.translation.x
-            this.botPositionY = msg.transform.translation.y
+            this.surveyorPositionX = msg.transform.translation.x
+            this.surveyorPositionY = msg.transform.translation.y
             const quaternion = rotationToQuaternion(msg.transform.rotation);
             const euler = quaternionToEuler(quaternion);
-            this.botHeading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
+            this.surveyorHeading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
 
             // Update the bot position icon
-            this.botPositionIcon.position.set(this.botPositionX, 0, -this.botPositionY);
-            this.botPositionIcon.rotation.z = this.botHeading;
-            this.botPositionIcon.visible = true;
+            const y = this.activeBot === "GEOSURVEY" ? 0.01 : 0;
+            this.surveyorIcon.position.set(this.surveyorPositionX, y, -this.surveyorPositionY);
+            this.surveyorIcon.rotation.z = this.surveyorHeading;
+            this.surveyorIcon.visible = true;
         } else {
             // Bot position unknown, the icon should be removed from display!
-            this.botPositionX = null;
-            this.botPositionY = null;
-            this.botPositionIcon.visible = false;
+            this.surveyorPositionX = null;
+            this.surveyorPositionY = null;
+            this.surveyorIcon.visible = false;
+        }
+    }
+
+    updateDiggerPosition(msg) {
+        if (msg != null) {
+            this.diggerPositionX = msg.transform.translation.x
+            this.diggerPositionY = msg.transform.translation.y
+            const quaternion = rotationToQuaternion(msg.transform.rotation);
+            const euler = quaternionToEuler(quaternion);
+            this.diggerHeading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
+
+            // Update the bot position icon
+            const y = this.activeBot === "DIGGER" ? 0.01 : 0;
+            this.diggerIcon.position.set(this.diggerPositionX, y, -this.diggerPositionY);
+            this.diggerIcon.rotation.z = this.diggerHeading;
+            this.diggerIcon.visible = true;
+        } else {
+            // Bot position unknown, the icon should be removed from display!
+            this.diggerPositionX = null;
+            this.diggerPositionY = null;
+            this.diggerIcon.visible = false;
         }
     }
 
     onData(msg) {
         if(msg._topic_name === "/tf") {
             this.updateSurveyorPosition(msg.surveyor);
-            this.activeBot = msg.activeBot;
+            this.updateDiggerPosition(msg.digger);
+            this.activeBot = msg.active_bot;
         } else if (msg.__comp) {
             this.mapFrame = msg.header.frame_id;
             this.decodeAndRenderCompressed(msg);
