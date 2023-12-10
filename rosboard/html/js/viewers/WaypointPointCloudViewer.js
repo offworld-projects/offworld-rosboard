@@ -28,6 +28,27 @@ class WaypointPointCloudViewer extends Viewer {
         this.pointsMesh = new THREE.Points(this.pointsBuffer, new THREE.PointsMaterial({ color: 0xff9933, size: 0.1 }));
         this.scene.add(this.pointsMesh);
 
+        this.mapFrame = "map";
+        
+        // Surveyor position indicator icon
+        this.botPositionX, this.botPositionY, this.botHeading;
+        const botIconTexture = new THREE.TextureLoader().load("icons/surveyor_position_indicator.png");
+        botIconTexture.magFilter = THREE.NearestFilter;
+        botIconTexture.minFilter = THREE.NearestFilter;
+        this.botPositionIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true }));
+        this.botPositionIcon.position.set(0, 0, 0);
+        this.botPositionIcon.rotation.x = -Math.PI / 2;
+        this.botPositionIcon.visible = false;
+
+        // Active waypoint icon
+        const activeBotTexture = new THREE.TextureLoader().load("icons/surveyor_position_indicator.png");
+        this.activeWaypointIcon = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true }));
+        this.activeWaypointIcon.rotation.x = -Math.PI / 2;
+        this.activeWaypointIcon.visible = false;
+
+        this.scene.add(this.botPositionIcon);
+
+
         const axisHelper = new THREE.AxesHelper(5);
         this.scene.add(axisHelper);
 
@@ -57,12 +78,12 @@ class WaypointPointCloudViewer extends Viewer {
                 this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), planeY), intersectionPoint);
 
                 // Convert threejs coordinates to map frame coordinates
-                const mapFramePoint = { x: intersectionPoint.x * this.map_resolution, y: -intersectionPoint.z * this.map_resolution };
+                const mapFramePoint = { x: intersectionPoint.x, y: -intersectionPoint.z };
 
                 // Send event to parent DOM object
-                if (mapFramePoint != null && this.mapFrame != null) {
+                if (mapFramePoint != null) {
                     if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
-                        this.activeWaypointIcon.position.set(mapFramePoint.x / this.map_resolution, 20, -mapFramePoint.y / this.map_resolution);
+                        this.activeWaypointIcon.position.set(mapFramePoint.x, -0.1, mapFramePoint.y);
                         this.activeWaypointIcon.visible = true;
                         currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
                     }
@@ -95,12 +116,35 @@ class WaypointPointCloudViewer extends Viewer {
         animate();
     }
 
+    updateSurveyorPosition(msg) {
+        if (msg != null) {
+            this.botPositionX = msg.transform.translation.x
+            this.botPositionY = msg.transform.translation.y
+            const quaternion = rotationToQuaternion(msg.transform.rotation);
+            const euler = quaternionToEuler(quaternion);
+            this.botHeading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
+
+            // Update the bot position icon
+            this.botPositionIcon.position.set(this.botPositionX, 0, -this.botPositionY);
+            this.botPositionIcon.rotation.z = this.botHeading;
+            this.botPositionIcon.visible = true;
+        } else {
+            // Bot position unknown, the icon should be removed from display!
+            this.botPositionX = null;
+            this.botPositionY = null;
+            this.botPositionIcon.visible = false;
+        }
+    }
 
     onData(msg) {
-        if (msg.__comp) {
+        if(msg._topic_name === "/tf") {
+            this.updateSurveyorPosition(msg.surveyor);
+            this.activeBot = msg.activeBot;
+        } else if (msg.__comp) {
+            this.mapFrame = msg.header.frame_id;
             this.decodeAndRenderCompressed(msg);
         } else {
-            console.info("Uncompressed pointclouds are not supported")
+            console.warn("Uncompressed pointclouds are not supported")
         }
     }
 
@@ -152,8 +196,7 @@ class WaypointPointCloudViewer extends Viewer {
     }
 }
 
-function messageToQuaternion(message) {
-    rotation = message._transform.rotation
+function rotationToQuaternion(rotation) {
     return new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
 }
 
