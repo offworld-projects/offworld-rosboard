@@ -393,7 +393,6 @@ class ROSBoardNode(object):
             
     def send_bot_tfs(self):
         while True:
-            time.sleep(1)
             if self.event_loop is None:
                 continue
             try:
@@ -403,17 +402,19 @@ class ROSBoardNode(object):
             except Exception as e:
                 rospy.logwarn(str(e))
                 traceback.print_exc()
+
+            time.sleep(1)
                 
     def get_tf_for_bot(self, bot):
         """Get the transform between map and bot base_link frame
         """
         try:
-            tf = self.tf_buffer.lookup_transform("map", f"{bot}/base_link", rospy.Time(0))
+            tf = self.tf_buffer.lookup_transform("map", f"{bot}/base_link", rospy.Time(0), rospy.Duration(2.0))
             if tf is None:
                 raise LookupError("No transform found between map and %s/base_link" % bot)
             return self.transform_stamped_to_json(tf)
         except Exception as e:
-            rospy.logwarn(str(e))
+            rospy._node.get_logger().warn(str(e), throttle_duration_sec=60)
             return None
         
     def transform_stamped_to_json(self, stamped_tf):

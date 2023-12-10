@@ -137,53 +137,32 @@ class WaypointPointCloudViewer extends Viewer {
         animate();
     }
 
-    updateSurveyorPosition(msg) {
+    updateBotPosition(botName, msg) {
         if (msg != null) {
-            this.bots.surveyor.position.x = msg.transform.translation.x
-            this.bots.surveyor.position.y = msg.transform.translation.y
+            this.bots[botName].position.x = msg.transform.translation.x
+            this.bots[botName].position.y = msg.transform.translation.y
             const quaternion = rotationToQuaternion(msg.transform.rotation);
             const euler = quaternionToEuler(quaternion);
-            this.bots.surveyor.heading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
+            this.bots[botName].heading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
 
             // Update the bot position icon
-            const y = this.activeBot === "GEOSURVEY" ? 0.01 : 0;
-            this.bots.surveyor.icon.position.set(this.bots.surveyor.position.x, y, -this.bots.surveyor.position.y);
-            this.bots.surveyor.icon.rotation.z = this.bots.surveyor.heading;
-            this.bots.surveyor.icon.visible = true;
+            const y = this.activeBot === botName ? 0.01 : 0;
+            this.bots[botName].icon.position.set(this.bots[botName].position.x, y, -this.bots[botName].position.y);
+            this.bots[botName].icon.rotation.z = this.bots[botName].heading;
+            this.bots[botName].icon.visible = true;
         } else {
             // Bot position unknown, the icon should be removed from display!
-            this.bots.surveyor.position.x = null;
-            this.bots.surveyor.position.y = null;
-            this.bots.surveyor.icon.visible = false;
-        }
-    }
-
-    updateDiggerPosition(msg) {
-        if (msg != null) {
-            this.diggerPositionX = msg.transform.translation.x
-            this.bots.digger.position.y = msg.transform.translation.y
-            const quaternion = rotationToQuaternion(msg.transform.rotation);
-            const euler = quaternionToEuler(quaternion);
-            this.bots.digger.heading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
-
-            // Update the bot position icon
-            const y = this.activeBot === "DIGGER" ? 0.01 : 0;
-            this.bots.digger.icon.position.set(this.diggerPositionX, y, -this.bots.digger.position.y);
-            this.bots.digger.icon.rotation.z = this.bots.digger.heading;
-            this.bots.digger.icon.visible = true;
-        } else {
-            // Bot position unknown, the icon should be removed from display!
-            this.diggerPositionX = null;
-            this.bots.digger.position.y = null;
-            this.bots.digger.icon.visible = false;
+            this.bots[botName].position.x = null;
+            this.bots[botName].position.y = null;
+            this.bots[botName].icon.visible = false;
         }
     }
 
     onData(msg) {
         if (msg._topic_name === "/tf") {
-            this.updateSurveyorPosition(msg.surveyor);
-            this.updateDiggerPosition(msg.digger);
-            this.activeBot = msg.active_bot;
+            this.activeBot = msg.active_bot === "GEOSURVEY" ? "surveyor" : "digger";
+            this.updateBotPosition("surveyor", msg.surveyor);
+            this.updateBotPosition("digger", msg.digger);
         } else if (msg.__comp) {
             this.mapFrame = msg.header.frame_id;
             this.decodeAndRenderCompressed(msg);
