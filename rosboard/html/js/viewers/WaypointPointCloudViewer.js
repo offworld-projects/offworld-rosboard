@@ -93,7 +93,7 @@ class WaypointPointCloudViewer extends Viewer {
                 // Send event to parent DOM object
                 if (mapFramePoint != null) {
                     if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
-                        this.activeWaypointIcon.position.set(mapFramePoint.x, -0.1, mapFramePoint.y);
+                        this.activeWaypointIcon.position.set(mapFramePoint.x, -0.1, -mapFramePoint.y);
                         this.activeWaypointIcon.visible = true;
                         currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
                     }
