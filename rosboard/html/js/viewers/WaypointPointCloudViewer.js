@@ -23,6 +23,11 @@ class WaypointPointCloudViewer extends Viewer {
         this.controls.setGizmosVisible(false);
         this.mouseDownX, this.mouseDownY;
 
+        // Set up points buffer
+        this.pointsBuffer = new THREE.BufferGeometry();
+        this.pointsMesh = new THREE.Points(this.pointsBuffer, new THREE.PointsMaterial({ color: 0xff9933, size: 0.1 }));
+        this.scene.add(this.pointsMesh);
+
         const axisHelper = new THREE.AxesHelper(5);
         this.scene.add(axisHelper);
 
@@ -82,25 +87,6 @@ class WaypointPointCloudViewer extends Viewer {
             // Update threejs scene
             this.controls.update();
             this.renderer.render(this.scene, this.camera);
-
-            const geometry = new THREE.BufferGeometry();
-
-            // create a simple square shape. We duplicate the top left and bottom right
-            // vertices because each vertex needs to appear once per triangle.
-            const vertices = new Float32Array( [
-                -1.0, -1.0,  1.0, // v0
-                1.0, -1.0,  1.0, // v1
-                1.0,  1.0,  1.0, // v2
-
-                1.0,  1.0,  1.0, // v3
-                -1.0,  1.0,  1.0, // v4
-                -1.0, -1.0,  1.0  // v5
-            ] );
-
-            // itemSize = 3 because there are 3 values (components) per vertex
-            geometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
-            const material = new THREE.MeshBasicMaterial( { color: 0xff0000 } );
-            const mesh = new THREE.Mesh( geometry, material );
         }
 
         document.addEventListener('mousedown', onMouseDown);
@@ -111,7 +97,7 @@ class WaypointPointCloudViewer extends Viewer {
 
 
     onData(msg) {
-        if(msg.__comp) {
+        if (msg.__comp) {
             this.decodeAndRenderCompressed(msg);
         } else {
             console.info("Uncompressed pointclouds are not supported")
@@ -126,7 +112,7 @@ class WaypointPointCloudViewer extends Viewer {
             bytes[i] = binary_string.charCodeAt(i);
         }
         return bytes.buffer;
-      }
+    }
 
     // TOOD: - Support rendering of uncompressed pointclouds
     decodeAndRenderCompressed(msg) {
@@ -142,29 +128,28 @@ class WaypointPointCloudViewer extends Viewer {
         //   scaled back correctly by the decompressor (this function)
 
         let bounds = msg._data_uint16.bounds;
-        let points_data = this._base64decode(msg._data_uint16.points);
-        let points_view = new DataView(points_data);
-    
-        let points = new Float32Array(Math.round(points_data.byteLength / 2));
-    
+        let points_bytes = this._base64decode(msg._data_uint16.points);
+        let points_view = new DataView(points_bytes);
+        let points = new Float32Array(Math.round(points_bytes.byteLength / 2));
+
         let xrange = bounds[1] - bounds[0];
         let xmin = bounds[0];
         let yrange = bounds[3] - bounds[2];
         let ymin = bounds[2];
         let zrange = bounds[5] - bounds[4];
         let zmin = bounds[4];
-    
-        for(let i=0; i<points_data.byteLength/6; i++) {
-          let offset = i * 6;
-          points[3*i] = (points_view.getUint16(offset, true) / 65535) * xrange + xmin;
-          points[3*i+1] = (points_view.getUint16(offset+2, true) / 65535) * yrange + ymin;
-          points[3*i+2] = (points_view.getUint16(offset+4, true) / 65535) * zrange + zmin;
+
+        for (let i = 0; i < points_bytes.byteLength / 6; i++) {
+            let offset = i * 6;
+            points[3 * i] = (points_view.getUint16(offset, true) / 65535) * xrange + xmin;
+            points[3 * i + 1] = (points_view.getUint16(offset + 2, true) / 65535) * yrange + ymin;
+            points[3 * i + 2] = (points_view.getUint16(offset + 4, true) / 65535) * zrange + zmin;
         }
-        const bufferGeometry = new THREE.BufferGeometry();
-        bufferGeometry.setAttribute( 'position', new THREE.BufferAttribute( points, 3 ) );
-        const mesh = new THREE.Points( bufferGeometry, new THREE.PointsMaterial( { color: 0xff0000, size: 0.1 } ) );
-        this.scene.add(mesh)
-      }
+        
+        this.pointsBuffer.setAttribute('position', new THREE.BufferAttribute(points, 3));
+        this.pointsMesh.scale.set(1, 1, -1); // Flip the z-axis to match ROS
+        this.pointsBuffer.rotateX(-Math.PI / 2);
+    }
 }
 
 function messageToQuaternion(message) {
