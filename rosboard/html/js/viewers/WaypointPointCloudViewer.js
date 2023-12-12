@@ -220,7 +220,6 @@ class WaypointPointCloudViewer extends Viewer {
         
         this.pointsBuffer.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         this.pointsBuffer.setAttribute('position', new THREE.BufferAttribute(points, 3));
-        this.pointsMesh.scale.set(1, 1, -1); // Flip the z-axis to match ROS
         this.pointsBuffer.rotateX(-Math.PI / 2);
     }
 }
