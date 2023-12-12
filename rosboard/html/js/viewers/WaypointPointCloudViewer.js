@@ -13,7 +13,7 @@ class WaypointPointCloudViewer extends Viewer {
         this.camera = new THREE.PerspectiveCamera(75, document.body.clientWidth / document.body.clientHeight, 0.1, 1000);
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(document.body.clientWidth, document.body.clientHeight);
-        this.camera.position.set(0, 100, 0);
+        this.camera.position.set(0, 10, 0);
         this.camera.lookAt(0, 0, 0);
         this.raycaster = new THREE.Raycaster();
         this.pointer = new THREE.Vector2();
@@ -25,14 +25,13 @@ class WaypointPointCloudViewer extends Viewer {
 
         // Set up points buffer
         this.pointsBuffer = new THREE.BufferGeometry();
-        this.pointsMesh = new THREE.Points(this.pointsBuffer, new THREE.PointsMaterial({ color: 0xff9933, size: 0.1 }));
+        this.pointsMesh = new THREE.Points(this.pointsBuffer, new THREE.PointsMaterial({ vertexColors: true, size: 0.1 }));
         this.scene.add(this.pointsMesh);
 
         this.mapFrame = "map";
 
-        const botIconTexture = new THREE.TextureLoader().load("icons/surveyor_position_indicator.png");
-        botIconTexture.magFilter = THREE.NearestFilter;
-        botIconTexture.minFilter = THREE.NearestFilter;
+        const surveyor_1_icon = new THREE.TextureLoader().load("icons/surveyor_1_icon.png");
+        const surveyor_2_icon = new THREE.TextureLoader().load("icons/surveyor_2_icon.png");
 
         this.bots = {
             surveyor: {
@@ -41,7 +40,7 @@ class WaypointPointCloudViewer extends Viewer {
                     y: null,
                     heading: null
                 },
-                icon: new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true })),
+                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_1_icon, transparent: true })),
             },
             digger: {
                 position: {
@@ -49,7 +48,7 @@ class WaypointPointCloudViewer extends Viewer {
                     y: null,
                     heading: null
                 },
-                icon: new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: botIconTexture, transparent: true })),
+                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_2_icon, transparent: true })),
             },
         }
 
@@ -65,13 +64,10 @@ class WaypointPointCloudViewer extends Viewer {
 
         // Active waypoint icon
         const activeBotTexture = new THREE.TextureLoader().load("icons/waypoint.png");
-        this.activeWaypointIcon = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true }));
+        this.activeWaypointIcon = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true }));
         this.activeWaypointIcon.rotation.x = -Math.PI / 2;
         this.activeWaypointIcon.visible = false;
         this.scene.add(this.activeWaypointIcon)
-
-        const axisHelper = new THREE.AxesHelper(5);
-        this.scene.add(axisHelper);
 
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
@@ -213,6 +209,16 @@ class WaypointPointCloudViewer extends Viewer {
             points[3 * i + 2] = (points_view.getUint16(offset + 4, true) / 65535) * zrange + zmin;
         }
 
+        const colors = [];
+        for (let i = 0; i < points.length; i+=3) {
+            const y = points[i + 2];
+            const hue = (((y - 0) * (1 - 0)) /  (0 + 3)) + 0;
+            let color = new THREE.Color();
+            color.setHSL(hue, 1.0, 0.5);
+            colors.push(color.r, color.g, color.b);
+        }
+        
+        this.pointsBuffer.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         this.pointsBuffer.setAttribute('position', new THREE.BufferAttribute(points, 3));
         this.pointsMesh.scale.set(1, 1, -1); // Flip the z-axis to match ROS
         this.pointsBuffer.rotateX(-Math.PI / 2);
