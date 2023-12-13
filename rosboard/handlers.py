@@ -202,6 +202,19 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
             op_name = argv[1].get("op_name")
             args = argv[1].get("args")
             self._overseer.run_op(op_name, **args)
+    
+    @classmethod
+    def send_bot_tfs(cls, tfs):
+        """
+        Send tf messages of bot base link and map frame to all sockets
+        """
+        for socket in cls.sockets:
+            try:
+                if socket.ws_connection and not socket.ws_connection.is_closing():
+                    socket.write_message(json.dumps([ROSBoardSocketHandler.MSG_TF, tfs], separators=(',', ':')))
+                socket.ping_seq += 1
+            except Exception as e:
+                print("Error sending message: %s" % str(e))
 
 ROSBoardSocketHandler.MSG_PING = "p";
 ROSBoardSocketHandler.MSG_PONG = "q";
@@ -211,6 +224,7 @@ ROSBoardSocketHandler.MSG_SUB = "s";
 ROSBoardSocketHandler.MSG_SYSTEM = "y";
 ROSBoardSocketHandler.MSG_UNSUB = "u";
 ROSBoardSocketHandler.MSG_OP = "o";
+ROSBoardSocketHandler.MSG_TF = "f";
 
 ROSBoardSocketHandler.PING_SEQ = "s";
 ROSBoardSocketHandler.PONG_SEQ = "s";

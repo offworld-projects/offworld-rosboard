@@ -15,6 +15,7 @@ importJsOnce("js/viewers/DiagnosticViewer.js");
 importJsOnce("js/viewers/TimeSeriesPlotViewer.js");
 importJsOnce("js/viewers/PointCloud2Viewer.js");
 importJsOnce("js/viewers/OccupancyGridViewer.js");
+importJsOnce("js/viewers/WaypointPointCloudViewer.js");
 
 // GenericViewer must be last
 importJsOnce("js/viewers/GenericViewer.js");
@@ -79,7 +80,12 @@ let onSystem = function(system) {
 }
 
 let onMsg = function(msg) {
-  if(!subscriptions[msg._topic_name]) {
+  if (msg._topic_name === "/tf") {
+    for(const subscriber in subscriptions) {
+      subscriptions[subscriber].viewer.update(msg);
+    }
+  }
+  else if(!subscriptions[msg._topic_name]) {
     console.log("Received unsolicited message", msg);
   } else if(!subscriptions[msg._topic_name].viewer) {
     console.log("Received msg but no viewer", msg);

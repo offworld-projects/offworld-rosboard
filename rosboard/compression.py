@@ -126,11 +126,16 @@ def decode_pcl2(cloud, field_names=None, skip_nans=False, uvs=[]):
     # if endianness between cloud and system doesn't match then byteswap everything
     if cloud.is_bigendian == np.little_endian:
         points = points.byteswap()
+    
+    # filter out points above this z value    
+    max_z_value = 2.0
+    filtered_points = points[points['z'] <= max_z_value]
+    
 
     if field_names is None:
-        return points
+        return filtered_points
     else:
-        return points[list(field_names)]
+        return filtered_points[list(field_names)]
 
 def compress_compressed_image(msg, output):
     output["data"] = []

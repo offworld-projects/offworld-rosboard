@@ -108,6 +108,9 @@ class ROSBoardNode(object):
 
         # loop to keep track of latencies and clock differences for each socket
         threading.Thread(target = self.pingpong_loop, daemon = True).start()
+        
+        # loop to send tfs to sockets
+        threading.Thread(target = self.send_bot_tfs, daemon=True).start()
 
         self.lock = threading.Lock()
 
@@ -379,38 +382,7 @@ class ROSBoardNode(object):
 
             # log last time we received data on this topic
             self.last_data_times_by_topic[topic_name] = t
-            
-            # If the message is one of the following types,
-            # we'll include the transform between bot base link
-            # and map frames in the msg header
-            TF_INCLUDE_TYPES = ["OccupancyGrid", "PointCloud2"]
-            for tf_type in TF_INCLUDE_TYPES:
-                if tf_type in topic_type:
-                    # Get the TF between bot base_link and map
-                    msg_frame = msg.header.frame_id
-                    bot_model = Settings.get("model").lower()
-                    base_link_frame = bot_model + "/base_link"
-                    
-                    try:
-                        tf = self.tf_buffer.lookup_transform(msg_frame, base_link_frame, rospy.Time(0))
-                        if tf is None:
-                            raise LookupError(f"No transform found between {msg_frame} and {base_link_frame}")
-
-                        ros_msg_dict["_transform"] = {}
-                        ros_msg_dict["_transform"]["position"] = {}
-                        ros_msg_dict["_transform"]["rotation"] = {}
-                        ros_msg_dict["_transform"]["position"]["x"] = tf.transform.translation.x
-                        ros_msg_dict["_transform"]["position"]["y"] = tf.transform.translation.y
-                        ros_msg_dict["_transform"]["position"]["z"] = tf.transform.translation.z
-                        ros_msg_dict["_transform"]["rotation"]["x"] = tf.transform.rotation.x
-                        ros_msg_dict["_transform"]["rotation"]["y"] = tf.transform.rotation.y
-                        ros_msg_dict["_transform"]["rotation"]["z"] = tf.transform.rotation.z
-                        ros_msg_dict["_transform"]["rotation"]["w"] = tf.transform.rotation.w
-                        
-                    except Exception as e:
-                        rospy.logwarn(str(e))
-                        ros_msg_dict["_transform"] = None
-
+    
             # broadcast it to the listeners that care    
             self.event_loop.add_callback(
                 ROSBoardSocketHandler.broadcast,
@@ -418,7 +390,55 @@ class ROSBoardNode(object):
             )
         else:
             rospy.logerr(ros_msg_dict["_error"])
+            
+    def send_bot_tfs(self):
+        while True:
+            if self.event_loop is None:
+                continue
+            try:
+                surveyor_tf = self.get_tf_for_bot("geosurvey")
+                digger_tf = self.get_tf_for_bot("digger")
+                self.event_loop.add_callback(ROSBoardSocketHandler.send_bot_tfs, {"_topic_name": "/tf", "surveyor": surveyor_tf, "digger": digger_tf, "active_bot": Settings.get("model")})
+            except Exception as e:
+                rospy.logwarn(str(e))
+                traceback.print_exc()
 
+            time.sleep(1)
+                
+    def get_tf_for_bot(self, bot):
+        """Get the transform between bot odom and bot base_link frame
+        """
+        try:
+            tf = self.tf_buffer.lookup_transform(f"{bot}/odom", f"{bot}/base_link", rospy.Time(0), rospy.Duration(2.0))
+            if tf is None:
+                raise LookupError("No transform found between map and %s/base_link" % bot)
+            return self.transform_stamped_to_json(tf)
+        except Exception as e:
+            rospy._node.get_logger().warn(str(e), throttle_duration_sec=60)
+            return None
+        
+    def transform_stamped_to_json(self, stamped_tf):
+        """Convert a tf2_ros message to a json
+        """
+        tf_json = {}
+        tf_json["header"] = {}
+        tf_json["header"]["frame_id"] = stamped_tf.header.frame_id
+        tf_json["header"]["stamp"] = {}
+        tf_json["header"]["stamp"]["secs"] = stamped_tf.header.stamp.secs
+        tf_json["header"]["stamp"]["nsecs"] = stamped_tf.header.stamp.nsecs
+        tf_json["child_frame_id"] = stamped_tf.child_frame_id
+        tf_json["transform"] = {}
+        tf_json["transform"]["translation"] = {}
+        tf_json["transform"]["translation"]["x"] = stamped_tf.transform.translation.x
+        tf_json["transform"]["translation"]["y"] = stamped_tf.transform.translation.y
+        tf_json["transform"]["translation"]["z"] = stamped_tf.transform.translation.z
+        tf_json["transform"]["rotation"] = {}
+        tf_json["transform"]["rotation"]["x"] = stamped_tf.transform.rotation.x
+        tf_json["transform"]["rotation"]["y"] = stamped_tf.transform.rotation.y
+        tf_json["transform"]["rotation"]["z"] = stamped_tf.transform.rotation.z
+        tf_json["transform"]["rotation"]["w"] = stamped_tf.transform.rotation.w
+        return tf_json
+        
 
 def main(args=None):
     ROSBoardNode().start()
