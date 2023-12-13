@@ -160,6 +160,7 @@ class WaypointPointCloudViewer extends Viewer {
 
     onData(msg) {
         if (msg._topic_name === "/tf") {
+            console.log(msg)
             this.activeBot = msg.active_bot === "GEOSURVEY" ? "surveyor" : "digger";
             this.updateBotPosition("surveyor", msg.surveyor);
             this.updateBotPosition("digger", msg.digger);

@@ -9,6 +9,7 @@ import tornado, tornado.web, tornado.websocket
 import traceback
 
 from tf2_ros import Buffer, TransformListener
+from std_msgs.msg import Float32MultiArray
 
 from bot_settings import Settings
 from bot_events import init_log
@@ -89,6 +90,12 @@ class ROSBoardNode(object):
         # Initialize TF listeners
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, rospy._node)
+        
+        # Create subscribers for active waypoints of each bot
+        rospy._node.create_subscription(Float32MultiArray, "/geosurvey/active_waypoint", self.surveyor_waypoint_callback, 1)
+        rospy._node.create_subscription(Float32MultiArray, "/digger/active_waypoint", self.digger_waypoint_callback, 1)
+        self.surveyor_waypoint = None
+        self.digger_waypoint = None
 
         self.event_loop = None
         self.tornado_application = tornado.web.Application(tornado_handlers, **tornado_settings)
@@ -110,7 +117,7 @@ class ROSBoardNode(object):
         threading.Thread(target = self.pingpong_loop, daemon = True).start()
         
         # loop to send tfs to sockets
-        threading.Thread(target = self.send_bot_tfs, daemon=True).start()
+        threading.Thread(target = self.send_bot_info, daemon=True).start()
 
         self.lock = threading.Lock()
 
@@ -390,15 +397,23 @@ class ROSBoardNode(object):
             )
         else:
             rospy.logerr(ros_msg_dict["_error"])
+
+    def surveyor_waypoint_callback(self, msg):
+        self.surveyor_waypoint = msg.data
+
+    def digger_waypoint_callback(self, msg):
+        self.digger_waypoint = msg.data
             
-    def send_bot_tfs(self):
+    def send_bot_info(self):
+        # Send bot transforms and active waypoints to sockets
         while True:
             if self.event_loop is None:
                 continue
             try:
                 surveyor_tf = self.get_tf_for_bot("geosurvey")
                 digger_tf = self.get_tf_for_bot("digger")
-                self.event_loop.add_callback(ROSBoardSocketHandler.send_bot_tfs, {"_topic_name": "/tf", "surveyor": surveyor_tf, "digger": digger_tf, "active_bot": Settings.get("model")})
+
+                self.event_loop.add_callback(ROSBoardSocketHandler.send_bot_info, {"_topic_name": "/tf", "surveyor": surveyor_tf, "digger": digger_tf, "active_bot": Settings.get("model"), "surveyor_waypoint": self.surveyor_waypoint, "digger_waypoint": self.digger_waypoint})
             except Exception as e:
                 rospy.logwarn(str(e))
                 traceback.print_exc()
