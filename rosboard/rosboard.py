@@ -92,8 +92,9 @@ class ROSBoardNode(object):
         self.tf_listener = TransformListener(self.tf_buffer, rospy._node)
         
         # Create subscribers for active waypoints of each bot
-        rospy._node.create_subscription(Float32MultiArray, "/geosurvey/active_waypoint", self.surveyor_waypoint_callback, 1)
-        rospy._node.create_subscription(Float32MultiArray, "/digger/active_waypoint", self.digger_waypoint_callback, 1)
+        qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        rospy._node.create_subscription(Float32MultiArray, "/geosurvey/active_waypoint", self.surveyor_waypoint_callback, qos)
+        rospy._node.create_subscription(Float32MultiArray, "/digger/active_waypoint", self.digger_waypoint_callback, qos)
         self.surveyor_waypoint = {}
         self.digger_waypoint = {}
 

@@ -10,6 +10,7 @@ import traceback
 import types
 import uuid
 
+import rclpy
 from std_msgs.msg import Float32MultiArray
 
 from . import __version__
@@ -65,8 +66,9 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
         }], separators=(',', ':')))
         
         # Publishers for active bot waypoint
-        self.surveyor_waypoint_pub = rospy._node.create_publisher(Float32MultiArray, "/geosurvey/active_waypoint", 1)
-        self.digger_waypoint_pub = rospy._node.create_publisher(Float32MultiArray, "/digger/active_waypoint", 1)
+        qos =  rclpy.qos.QoSProfile(depth=1, durability=rclpy.qos.QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self.surveyor_waypoint_pub = rospy._node.create_publisher(Float32MultiArray, "/geosurvey/active_waypoint", qos)
+        self.digger_waypoint_pub = rospy._node.create_publisher(Float32MultiArray, "/digger/active_waypoint", qos)
 
     def on_close(self):
         ROSBoardSocketHandler.sockets.remove(self)
