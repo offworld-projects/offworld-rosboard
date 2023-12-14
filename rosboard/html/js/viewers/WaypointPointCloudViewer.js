@@ -73,6 +73,10 @@ class WaypointPointCloudViewer extends Viewer {
         this.bots.digger.waypoint.visible = false;
         this.scene.add(this.bots.digger.waypoint)
 
+        // Axis helper
+        const axisHelper = new THREE.AxesHelper(5);
+        this.scene.add(axisHelper);
+
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
 
@@ -141,19 +145,18 @@ class WaypointPointCloudViewer extends Viewer {
         }
     }
 
-    updateBotPosition(botName, msg) {
-        if (msg != null) {
-            this.bots[botName].position.x = msg.transform.translation.x
-            this.bots[botName].position.y = msg.transform.translation.y
-            const quaternion = rotationToQuaternion(msg.transform.rotation);
+    updateBotPosition(botName, tfMsg, waypointMsg) {
+        if (tfMsg != null) {
+            this.bots[botName].position.x = tfMsg.transform.translation.x
+            this.bots[botName].position.y = tfMsg.transform.translation.y
+            const quaternion = rotationToQuaternion(tfMsg.transform.rotation);
             const euler = quaternionToEuler(quaternion);
             this.bots[botName].heading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
+            const bot = botName + "_waypoint";
+            console.log(bot)
 
-            const waypoint_x = msg[botName + "_waypoint"].x;
-            const waypoint_y = msg[botName + "_waypoint"].y;
-
-            if(waypoint_x && waypoint_y) {
-                this.bots[botName].waypoint.position.set(waypoint_x, -0.1, -waypoint_y);
+            if(waypointMsg.x && waypointMsg.y) {
+                this.bots[botName].waypoint.position.set(waypointMsg.x, -0.1, -waypointMsg.y);
             }
 
             // Update the bot position icon
@@ -171,10 +174,9 @@ class WaypointPointCloudViewer extends Viewer {
 
     onData(msg) {
         if (msg._topic_name === "/tf") {
-            console.log(msg)
             this.activeBot = msg.active_bot === "GEOSURVEY" ? "surveyor" : "digger";
-            this.updateBotPosition("surveyor", msg.surveyor);
-            this.updateBotPosition("digger", msg.digger);
+            this.updateBotPosition("surveyor", msg.surveyor, msg.surveyor_waypoint);
+            this.updateBotPosition("digger", msg.digger, msg.digger_waypoint);
         } else if (msg.__comp) {
             this.decodeAndRenderCompressed(msg);
             sessionStorage.setItem("lastPclMsg", JSON.stringify(msg));
