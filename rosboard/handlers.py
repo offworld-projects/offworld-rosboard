@@ -15,6 +15,7 @@ from std_msgs.msg import Float32MultiArray
 from . import __version__
 import rosboard.rospy2 as rospy
 from bot_overseer_api import OverseerAPI
+from bot_settings import Settings
 
 class ViewerHandler(tornado.web.RequestHandler):
     def get(self):
@@ -32,6 +33,7 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
         # store the instance of the ROS node that created this WebSocketHandler so we can access it later
         self.node = node
         self._overseer = OverseerAPI()
+        self._bot_model = Settings.get("model")
 
     def get_compression_options(self):
         # Non-None enables compression with default options.
@@ -210,7 +212,12 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
             op_name = argv[1].get("op_name")
             args = argv[1].get("args")
             self._overseer.run_op(op_name, **args)
-            self.surveyor_waypoint_pub.publish(Float32MultiArray(data=[args.get("x"), args.get("y")]))
+            
+            # Publish waypoint info under the topic for the active bot
+            if self._bot_model == "GEOSURVEY":
+                self.surveyor_waypoint_pub.publish(Float32MultiArray(data=[args.get("x"), args.get("y")]))
+            else:
+                self.digger_waypoint_pub.publish(Float32MultiArray(data=[args.get("x"), args.get("y")]))
     
     @classmethod
     def send_bot_info(cls, info):

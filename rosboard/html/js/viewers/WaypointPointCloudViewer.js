@@ -32,6 +32,7 @@ class WaypointPointCloudViewer extends Viewer {
 
         const surveyor_1_icon = new THREE.TextureLoader().load("icons/surveyor_1_icon.png");
         const surveyor_2_icon = new THREE.TextureLoader().load("icons/surveyor_2_icon.png");
+        const activeBotTexture = new THREE.TextureLoader().load("icons/waypoint.png");
 
         this.bots = {
             surveyor: {
@@ -41,6 +42,7 @@ class WaypointPointCloudViewer extends Viewer {
                     heading: null
                 },
                 icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_1_icon, transparent: true })),
+                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true })),
             },
             digger: {
                 position: {
@@ -49,6 +51,7 @@ class WaypointPointCloudViewer extends Viewer {
                     heading: null
                 },
                 icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_2_icon, transparent: true })),
+                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true })),
             },
         }
 
@@ -63,11 +66,12 @@ class WaypointPointCloudViewer extends Viewer {
         this.scene.add(this.bots.digger.icon);
 
         // Active waypoint icon
-        const activeBotTexture = new THREE.TextureLoader().load("icons/waypoint.png");
-        this.activeWaypointIcon = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true }));
-        this.activeWaypointIcon.rotation.x = -Math.PI / 2;
-        this.activeWaypointIcon.visible = false;
-        this.scene.add(this.activeWaypointIcon)
+        this.bots.surveyor.waypoint.rotation.x = -Math.PI / 2;
+        this.bots.surveyor.waypoint.visible = false;
+        this.scene.add(this.bots.surveyor.waypoint)
+        this.bots.digger.waypoint.rotation.x = -Math.PI / 2;
+        this.bots.digger.waypoint.visible = false;
+        this.scene.add(this.bots.digger.waypoint)
 
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
@@ -96,12 +100,12 @@ class WaypointPointCloudViewer extends Viewer {
 
                 // Convert threejs coordinates to map frame coordinates
                 const mapFramePoint = { x: intersectionPoint.x, y: -intersectionPoint.z };
-
-                // Send event to parent DOM object
+                
+                // Run NAV op
                 if (mapFramePoint != null) {
                     if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
-                        this.activeWaypointIcon.position.set(mapFramePoint.x, -0.1, -mapFramePoint.y);
-                        this.activeWaypointIcon.visible = true;
+                        this.bots[this.activeBot].waypoint.position.set(mapFramePoint.x, -0.1, -mapFramePoint.y);
+                        this.bots[this.activeBot].waypoint.visible = true;
                         currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
                     }
                 }
@@ -145,6 +149,13 @@ class WaypointPointCloudViewer extends Viewer {
             const euler = quaternionToEuler(quaternion);
             this.bots[botName].heading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
 
+            const waypoint_x = msg[botName + "_waypoint"].x;
+            const waypoint_y = msg[botName + "_waypoint"].y;
+
+            if(waypoint_x && waypoint_y) {
+                this.bots[botName].waypoint.position.set(waypoint_x, -0.1, -waypoint_y);
+            }
+
             // Update the bot position icon
             const y = this.activeBot === botName ? 0.01 : 0;
             this.bots[botName].icon.position.set(this.bots[botName].position.x, y, -this.bots[botName].position.y);
@@ -165,9 +176,8 @@ class WaypointPointCloudViewer extends Viewer {
             this.updateBotPosition("surveyor", msg.surveyor);
             this.updateBotPosition("digger", msg.digger);
         } else if (msg.__comp) {
-            sessionStorage.setItem("lastPclMsg", JSON.stringify(msg));
-            this.mapFrame = msg.header.frame_id;
             this.decodeAndRenderCompressed(msg);
+            sessionStorage.setItem("lastPclMsg", JSON.stringify(msg));
         } else {
             console.warn("Uncompressed pointclouds are not supported")
         }
@@ -223,7 +233,7 @@ class WaypointPointCloudViewer extends Viewer {
             color.setHSL(hue, 1.0, 0.5);
             colors.push(color.r, color.g, color.b);
         }
-        
+
         this.pointsBuffer.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         this.pointsBuffer.setAttribute('position', new THREE.BufferAttribute(points, 3));
         this.pointsBuffer.rotateX(-Math.PI / 2);
