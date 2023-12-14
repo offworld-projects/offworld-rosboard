@@ -30,9 +30,11 @@ class WaypointPointCloudViewer extends Viewer {
 
         this.mapFrame = "map";
 
-        const surveyor_1_icon = new THREE.TextureLoader().load("icons/surveyor_1_icon.png");
-        const surveyor_2_icon = new THREE.TextureLoader().load("icons/surveyor_2_icon.png");
-        const activeBotTexture = new THREE.TextureLoader().load("icons/waypoint.png");
+        const surveyorTexture = new THREE.TextureLoader().load("icons/surveyor_1_icon.png");
+        const diggerTexture = new THREE.TextureLoader().load("icons/surveyor_2_icon.png");
+        const surveyorWaypointTexture = new THREE.TextureLoader().load("icons/surveyor_waypoint.png");
+        const diggerWaypointTexture = new THREE.TextureLoader().load("icons/digger_waypoint.png");
+
 
         this.bots = {
             surveyor: {
@@ -41,8 +43,8 @@ class WaypointPointCloudViewer extends Viewer {
                     y: null,
                     heading: null
                 },
-                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_1_icon, transparent: true })),
-                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true })),
+                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyorTexture, transparent: true })),
+                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyorWaypointTexture, transparent: true })),
             },
             digger: {
                 position: {
@@ -50,8 +52,8 @@ class WaypointPointCloudViewer extends Viewer {
                     y: null,
                     heading: null
                 },
-                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_2_icon, transparent: true })),
-                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true })),
+                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: diggerTexture, transparent: true })),
+                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: diggerWaypointTexture, transparent: true })),
             },
         }
 
@@ -65,17 +67,13 @@ class WaypointPointCloudViewer extends Viewer {
         this.bots.digger.icon.visible = false;
         this.scene.add(this.bots.digger.icon);
 
-        // Active waypoint icon
+        // Active waypoint icons
         this.bots.surveyor.waypoint.rotation.x = -Math.PI / 2;
         this.bots.surveyor.waypoint.visible = false;
         this.scene.add(this.bots.surveyor.waypoint)
         this.bots.digger.waypoint.rotation.x = -Math.PI / 2;
         this.bots.digger.waypoint.visible = false;
         this.scene.add(this.bots.digger.waypoint)
-
-        // Axis helper
-        const axisHelper = new THREE.AxesHelper(5);
-        this.scene.add(axisHelper);
 
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
@@ -152,12 +150,6 @@ class WaypointPointCloudViewer extends Viewer {
             const quaternion = rotationToQuaternion(tfMsg.transform.rotation);
             const euler = quaternionToEuler(quaternion);
             this.bots[botName].heading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
-            const bot = botName + "_waypoint";
-            console.log(bot)
-
-            if(waypointMsg.x && waypointMsg.y) {
-                this.bots[botName].waypoint.position.set(waypointMsg.x, -0.1, -waypointMsg.y);
-            }
 
             // Update the bot position icon
             const y = this.activeBot === botName ? 0.01 : 0;
@@ -170,10 +162,18 @@ class WaypointPointCloudViewer extends Viewer {
             this.bots[botName].position.y = null;
             this.bots[botName].icon.visible = false;
         }
+
+        // Update the bot waypoint icon
+        if(waypointMsg.x && waypointMsg.y) {
+            const y = this.activeBot === botName ? -0.1 : -0.11;
+            this.bots[botName].waypoint.position.set(waypointMsg.x, y, waypointMsg.y);
+            this.bots[botName].waypoint.visible = true;
+        }
     }
 
     onData(msg) {
         if (msg._topic_name === "/tf") {
+            console.log(msg)
             this.activeBot = msg.active_bot === "GEOSURVEY" ? "surveyor" : "digger";
             this.updateBotPosition("surveyor", msg.surveyor, msg.surveyor_waypoint);
             this.updateBotPosition("digger", msg.digger, msg.digger_waypoint);
