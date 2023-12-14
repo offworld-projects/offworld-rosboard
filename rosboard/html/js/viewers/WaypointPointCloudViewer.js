@@ -69,6 +69,12 @@ class WaypointPointCloudViewer extends Viewer {
         this.activeWaypointIcon.visible = false;
         this.scene.add(this.activeWaypointIcon)
 
+        // Local costmap plane boundary
+        this.costmapBoundary = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({ color: "0xffffff" }));
+        this.costmapBoundary.rotation.x = -Math.PI / 2;
+        this.costmapBoundary.visible = false;
+        this.scene.add(this.costmapBoundary);
+
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
 
@@ -146,11 +152,22 @@ class WaypointPointCloudViewer extends Viewer {
             this.bots[botName].icon.position.set(this.bots[botName].position.x, y, -this.bots[botName].position.y);
             this.bots[botName].icon.rotation.z = this.bots[botName].heading;
             this.bots[botName].icon.visible = true;
+
+            // Move the costmap boundary plane to the active bot's current position
+            if (botName === this.activeBot) {
+                this.costmapBoundary.position.set(
+                    this.bots[botName].position.x,
+                    0.0,
+                    this.bots[botName].position.y
+                );
+                this.costmapBoundary.visible = true;
+            }
         } else {
             // Bot position unknown, the icon should be removed from display!
             this.bots[botName].position.x = null;
             this.bots[botName].position.y = null;
             this.bots[botName].icon.visible = false;
+            this.costmapBoundary.visible = false;
         }
     }
 
@@ -210,14 +227,14 @@ class WaypointPointCloudViewer extends Viewer {
         }
 
         const colors = [];
-        for (let i = 0; i < points.length; i+=3) {
+        for (let i = 0; i < points.length; i += 3) {
             const y = points[i + 2];
-            const hue = (((y - 0) * (1 - 0)) /  (0 + 3)) + 0;
+            const hue = (((y - 0) * (1 - 0)) / (0 + 3)) + 0;
             let color = new THREE.Color();
             color.setHSL(hue, 1.0, 0.5);
             colors.push(color.r, color.g, color.b);
         }
-        
+
         this.pointsBuffer.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         this.pointsBuffer.setAttribute('position', new THREE.BufferAttribute(points, 3));
         this.pointsBuffer.rotateX(-Math.PI / 2);
