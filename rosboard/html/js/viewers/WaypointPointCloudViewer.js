@@ -131,6 +131,10 @@ class WaypointPointCloudViewer extends Viewer {
         document.addEventListener('mouseup', onMouseUp);
         $(this.renderer.domElement).appendTo(this.card.content);
         animate();
+
+        if(sessionStorage.getItem("lastPclMsg")) {
+            this.onData(JSON.parse(sessionStorage.getItem("lastPclMsg")));
+        }
     }
 
     updateBotPosition(botName, msg) {
@@ -160,6 +164,7 @@ class WaypointPointCloudViewer extends Viewer {
             this.updateBotPosition("surveyor", msg.surveyor);
             this.updateBotPosition("digger", msg.digger);
         } else if (msg.__comp) {
+            sessionStorage.setItem("lastPclMsg", JSON.stringify(msg));
             this.mapFrame = msg.header.frame_id;
             this.decodeAndRenderCompressed(msg);
         } else {
