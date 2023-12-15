@@ -108,7 +108,8 @@ class WaypointPointCloudViewer extends Viewer {
                     if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
                         this.bots[this.activeBot].waypoint.position.set(mapFramePoint.x, -0.1, -mapFramePoint.y);
                         this.bots[this.activeBot].waypoint.visible = true;
-                        currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
+                        const yaw = this.getBotToGoalAngle(this.activeBot);
+                        currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, yaw_rad: yaw, frame: this.mapFrame } });
                     }
                 }
             }
@@ -173,7 +174,6 @@ class WaypointPointCloudViewer extends Viewer {
 
     onData(msg) {
         if (msg._topic_name === "/tf") {
-            console.log(msg)
             this.activeBot = msg.active_bot === "GEOSURVEY" ? "surveyor" : "digger";
             this.updateBotPosition("surveyor", msg.surveyor, msg.surveyor_waypoint);
             this.updateBotPosition("digger", msg.digger, msg.digger_waypoint);
@@ -239,6 +239,15 @@ class WaypointPointCloudViewer extends Viewer {
         this.pointsBuffer.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         this.pointsBuffer.setAttribute('position', new THREE.BufferAttribute(points, 3));
         this.pointsBuffer.rotateX(-Math.PI / 2);
+    }
+
+    getBotToGoalAngle(botName) {
+        if (this.bots[botName].position.x == null) {
+            return null;
+        }
+        const dx = this.bots[botName].waypoint.position.x - this.bots[botName].position.x;
+        const dy = this.bots[botName].waypoint.position.z - this.bots[botName].position.y;
+        return Math.atan2(dy, dx);
     }
 }
 
