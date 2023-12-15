@@ -78,9 +78,6 @@ class WaypointPointCloudViewer extends Viewer {
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
 
-        const axisHelper = new THREE.AxesHelper(5);
-        this.scene.add(axisHelper);
-
         const onMouseDown = (event) => {
             // Later used to determine if the mouse has moved since the mouse down event
             this.mouseDownX = event.clientX;
@@ -105,14 +102,21 @@ class WaypointPointCloudViewer extends Viewer {
 
                 // Convert threejs coordinates to map frame coordinates
                 const mapFramePoint = { x: intersectionPoint.x, y: -intersectionPoint.z };
-                
+
                 // Run NAV op
                 if (mapFramePoint != null) {
                     if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
                         this.bots[this.activeBot].waypoint.position.set(mapFramePoint.x, -0.1, -mapFramePoint.y);
                         this.bots[this.activeBot].waypoint.visible = true;
                         const yaw = this.getBotToGoalAngle(this.activeBot);
-                        currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, yaw_rad: yaw, frame: this.mapFrame } });
+                        currentTransport.sendOpRequest({
+                            op: "NAV.MOVE_TO", args: {
+                                x: mapFramePoint.x,
+                                y: mapFramePoint.y,
+                                yaw_rad: yaw,
+                                frame: this.mapFrame
+                            }
+                        });
                     }
                 }
             }
@@ -142,7 +146,7 @@ class WaypointPointCloudViewer extends Viewer {
         $(this.renderer.domElement).appendTo(this.card.content);
         animate();
 
-        if(sessionStorage.getItem("lastPclMsg")) {
+        if (sessionStorage.getItem("lastPclMsg")) {
             this.onData(JSON.parse(sessionStorage.getItem("lastPclMsg")));
         }
     }
@@ -168,7 +172,7 @@ class WaypointPointCloudViewer extends Viewer {
         }
 
         // Update the bot waypoint icon
-        if(waypointMsg.x && waypointMsg.y) {
+        if (waypointMsg.x && waypointMsg.y) {
             const y = this.activeBot === botName ? -0.1 : -0.11;
             this.bots[botName].waypoint.position.set(waypointMsg.x, y, -waypointMsg.y);
             this.bots[botName].waypoint.visible = true;
@@ -181,8 +185,8 @@ class WaypointPointCloudViewer extends Viewer {
             this.updateBotPosition("surveyor", msg.surveyor, msg.surveyor_waypoint);
             this.updateBotPosition("digger", msg.digger, msg.digger_waypoint);
         } else if (msg.__comp) {
-            this.decodeAndRenderCompressed(msg);
             sessionStorage.setItem("lastPclMsg", JSON.stringify(msg));
+            this.decodeAndRenderCompressed(msg);
         } else {
             console.warn("Uncompressed pointclouds are not supported")
         }
@@ -229,12 +233,12 @@ class WaypointPointCloudViewer extends Viewer {
             points[3 * i + 1] = (points_view.getUint16(offset + 2, true) / 65535) * yrange + ymin;
             points[3 * i + 2] = (points_view.getUint16(offset + 4, true) / 65535) * zrange + zmin;
         }
-        
+
         // Add color to the points based on elevation
         const colors = [];
-        for (let i = 0; i < points.length; i+=3) {
+        for (let i = 0; i < points.length; i += 3) {
             const y = points[i + 2];
-            const hue = (((y - 0) * (1 - 0)) /  (0 + 3)) + 0;
+            const hue = (((y - 0) * (1 - 0)) / (0 + 3)) + 0;
             let color = new THREE.Color();
             color.setHSL(hue, 1.0, 0.5);
             colors.push(color.r, color.g, color.b);
@@ -249,9 +253,10 @@ class WaypointPointCloudViewer extends Viewer {
         if (this.bots[botName].position.x == null) {
             return null;
         }
+
         const dx = this.bots[botName].waypoint.position.x - this.bots[botName].position.x;
-        const dy = this.bots[botName].waypoint.position.z - this.bots[botName].position.y;
-        return Math.atan2(dy, dx) % (2 * Math.PI);
+        const dy = this.bots[botName].waypoint.position.z + this.bots[botName].position.y;
+        return Math.atan2(dy, dx);
     }
 }
 

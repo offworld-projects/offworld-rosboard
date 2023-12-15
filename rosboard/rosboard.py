@@ -446,7 +446,7 @@ class ROSBoardNode(object):
         """Get the transform between map and bot base_link frame
         """
         try:
-            tf = self.tf_buffer.lookup_transform("map", f"{bot}/base_link", rospy.Time(0), rospy.Duration(2.0))
+            tf = self.tf_buffer.lookup_transform("map", f"{bot}/base_link", rospy.Time(0), rospy.Duration(10.0))
             if tf is None:
                 raise LookupError("No transform found between map and %s/base_link" % bot)
             return self.transform_stamped_to_json(tf)
