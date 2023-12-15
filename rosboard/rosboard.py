@@ -418,12 +418,12 @@ class ROSBoardNode(object):
                 
                 surveyor_waypoint = {
                     "x": self.surveyor_waypoint.get("x"),
-                    "y": self.surveyor_waypoint.get("x")
+                    "y": self.surveyor_waypoint.get("y")
                 }
 
                 digger_waypoint = {
                     "x": self.digger_waypoint.get("x"),
-                    "y": self.digger_waypoint.get("x")
+                    "y": self.digger_waypoint.get("y")
                 }
                 
 

@@ -213,6 +213,7 @@ class ROSBoardSocketHandler(tornado.websocket.WebSocketHandler):
 
             op_name = argv[1].get("op_name")
             args = argv[1].get("args")
+            print("Sending bot to " + str(args))
             self._overseer.run_op(op_name, **args)
             
             # Publish waypoint info under the topic for the active bot

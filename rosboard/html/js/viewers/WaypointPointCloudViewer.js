@@ -78,6 +78,9 @@ class WaypointPointCloudViewer extends Viewer {
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
 
+        const axisHelper = new THREE.AxesHelper(5);
+        this.scene.add(axisHelper);
+
         const onMouseDown = (event) => {
             // Later used to determine if the mouse has moved since the mouse down event
             this.mouseDownX = event.clientX;
@@ -167,7 +170,7 @@ class WaypointPointCloudViewer extends Viewer {
         // Update the bot waypoint icon
         if(waypointMsg.x && waypointMsg.y) {
             const y = this.activeBot === botName ? -0.1 : -0.11;
-            this.bots[botName].waypoint.position.set(waypointMsg.x, y, waypointMsg.y);
+            this.bots[botName].waypoint.position.set(waypointMsg.x, y, -waypointMsg.y);
             this.bots[botName].waypoint.visible = true;
         }
     }
@@ -226,7 +229,8 @@ class WaypointPointCloudViewer extends Viewer {
             points[3 * i + 1] = (points_view.getUint16(offset + 2, true) / 65535) * yrange + ymin;
             points[3 * i + 2] = (points_view.getUint16(offset + 4, true) / 65535) * zrange + zmin;
         }
-
+        
+        // Add color to the points based on elevation
         const colors = [];
         for (let i = 0; i < points.length; i+=3) {
             const y = points[i + 2];
@@ -247,7 +251,7 @@ class WaypointPointCloudViewer extends Viewer {
         }
         const dx = this.bots[botName].waypoint.position.x - this.bots[botName].position.x;
         const dy = this.bots[botName].waypoint.position.z - this.bots[botName].position.y;
-        return Math.atan2(dy, dx);
+        return Math.atan2(dy, dx) % (2 * Math.PI);
     }
 }
 
