@@ -9,6 +9,7 @@ import tornado, tornado.web, tornado.websocket
 import traceback
 
 from tf2_ros import Buffer, TransformListener
+from std_msgs.msg import Float32MultiArray
 
 from bot_settings import Settings
 from bot_events import init_log
@@ -89,6 +90,13 @@ class ROSBoardNode(object):
         # Initialize TF listeners
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, rospy._node)
+        
+        # Create subscribers for active waypoints of each bot
+        qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        rospy._node.create_subscription(Float32MultiArray, "/geosurvey/active_waypoint", self.surveyor_waypoint_callback, qos)
+        rospy._node.create_subscription(Float32MultiArray, "/digger/active_waypoint", self.digger_waypoint_callback, qos)
+        self.surveyor_waypoint = {}
+        self.digger_waypoint = {}
 
         self.event_loop = None
         self.tornado_application = tornado.web.Application(tornado_handlers, **tornado_settings)
@@ -110,7 +118,7 @@ class ROSBoardNode(object):
         threading.Thread(target = self.pingpong_loop, daemon = True).start()
         
         # loop to send tfs to sockets
-        threading.Thread(target = self.send_bot_tfs, daemon=True).start()
+        threading.Thread(target = self.send_bot_info, daemon=True).start()
 
         self.lock = threading.Lock()
 
@@ -383,22 +391,51 @@ class ROSBoardNode(object):
             # log last time we received data on this topic
             self.last_data_times_by_topic[topic_name] = t
     
-            # broadcast it to the listeners that care    
+            # broadcast it to the listeners that care 
             self.event_loop.add_callback(
                 ROSBoardSocketHandler.broadcast,
                 [ROSBoardSocketHandler.MSG_MSG, ros_msg_dict]
             )
         else:
             rospy.logerr(ros_msg_dict["_error"])
+
+    def surveyor_waypoint_callback(self, msg):
+        self.surveyor_waypoint["x"] = msg.data[0]
+        self.surveyor_waypoint["y"] = msg.data[1]
+        
+    def digger_waypoint_callback(self, msg):
+        self.digger_waypoint["x"] = msg.data[0]
+        self.digger_waypoint["y"] = msg.data[1]
             
-    def send_bot_tfs(self):
+    def send_bot_info(self):
+        # Send bot transforms and active waypoints to sockets
         while True:
             if self.event_loop is None:
                 continue
             try:
                 surveyor_tf = self.get_tf_for_bot("geosurvey")
                 digger_tf = self.get_tf_for_bot("digger")
-                self.event_loop.add_callback(ROSBoardSocketHandler.send_bot_tfs, {"_topic_name": "/tf", "surveyor": surveyor_tf, "digger": digger_tf, "active_bot": Settings.get("model")})
+                
+                surveyor_waypoint = {
+                    "x": self.surveyor_waypoint.get("x"),
+                    "y": self.surveyor_waypoint.get("y")
+                }
+
+                digger_waypoint = {
+                    "x": self.digger_waypoint.get("x"),
+                    "y": self.digger_waypoint.get("y")
+                }
+                
+
+                self.event_loop.add_callback(ROSBoardSocketHandler.send_bot_info, {
+                    "_topic_name": "/tf",
+                    "surveyor": surveyor_tf,
+                    "digger": digger_tf,
+                    "active_bot": Settings.get("model"),
+                    "surveyor_waypoint": surveyor_waypoint,
+                    "digger_waypoint": digger_waypoint,
+                })
+
             except Exception as e:
                 rospy.logwarn(str(e))
                 traceback.print_exc()
@@ -406,10 +443,10 @@ class ROSBoardNode(object):
             time.sleep(1)
                 
     def get_tf_for_bot(self, bot):
-        """Get the transform between bot odom and bot base_link frame
+        """Get the transform between map and bot base_link frame
         """
         try:
-            tf = self.tf_buffer.lookup_transform(f"{bot}/odom", f"{bot}/base_link", rospy.Time(0), rospy.Duration(2.0))
+            tf = self.tf_buffer.lookup_transform("map", f"{bot}/base_link", rospy.Time(0), rospy.Duration(10.0))
             if tf is None:
                 raise LookupError("No transform found between map and %s/base_link" % bot)
             return self.transform_stamped_to_json(tf)

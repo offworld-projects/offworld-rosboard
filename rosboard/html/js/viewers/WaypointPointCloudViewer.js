@@ -30,8 +30,11 @@ class WaypointPointCloudViewer extends Viewer {
 
         this.mapFrame = "map";
 
-        const surveyor_1_icon = new THREE.TextureLoader().load("icons/surveyor_1_icon.png");
-        const surveyor_2_icon = new THREE.TextureLoader().load("icons/surveyor_2_icon.png");
+        const surveyorTexture = new THREE.TextureLoader().load("icons/surveyor_1_icon.png");
+        const diggerTexture = new THREE.TextureLoader().load("icons/surveyor_2_icon.png");
+        const surveyorWaypointTexture = new THREE.TextureLoader().load("icons/surveyor_waypoint.png");
+        const diggerWaypointTexture = new THREE.TextureLoader().load("icons/digger_waypoint.png");
+
 
         this.bots = {
             surveyor: {
@@ -40,7 +43,8 @@ class WaypointPointCloudViewer extends Viewer {
                     y: null,
                     heading: null
                 },
-                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_1_icon, transparent: true })),
+                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyorTexture, transparent: true })),
+                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyorWaypointTexture, transparent: true })),
             },
             digger: {
                 position: {
@@ -48,7 +52,8 @@ class WaypointPointCloudViewer extends Viewer {
                     y: null,
                     heading: null
                 },
-                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: surveyor_2_icon, transparent: true })),
+                icon: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: diggerTexture, transparent: true })),
+                waypoint: new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: diggerWaypointTexture, transparent: true })),
             },
         }
 
@@ -62,12 +67,13 @@ class WaypointPointCloudViewer extends Viewer {
         this.bots.digger.icon.visible = false;
         this.scene.add(this.bots.digger.icon);
 
-        // Active waypoint icon
-        const activeBotTexture = new THREE.TextureLoader().load("icons/waypoint.png");
-        this.activeWaypointIcon = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: activeBotTexture, transparent: true }));
-        this.activeWaypointIcon.rotation.x = -Math.PI / 2;
-        this.activeWaypointIcon.visible = false;
-        this.scene.add(this.activeWaypointIcon)
+        // Active waypoint icons
+        this.bots.surveyor.waypoint.rotation.x = -Math.PI / 2;
+        this.bots.surveyor.waypoint.visible = false;
+        this.scene.add(this.bots.surveyor.waypoint)
+        this.bots.digger.waypoint.rotation.x = -Math.PI / 2;
+        this.bots.digger.waypoint.visible = false;
+        this.scene.add(this.bots.digger.waypoint)
 
         // Invisible plane to intersect with the raycaster
         const planeY = 0;
@@ -97,12 +103,20 @@ class WaypointPointCloudViewer extends Viewer {
                 // Convert threejs coordinates to map frame coordinates
                 const mapFramePoint = { x: intersectionPoint.x, y: -intersectionPoint.z };
 
-                // Send event to parent DOM object
+                // Run NAV op
                 if (mapFramePoint != null) {
                     if (confirm("Move to (" + mapFramePoint.x + ", " + mapFramePoint.y + ") in frame " + this.mapFrame + "?")) {
-                        this.activeWaypointIcon.position.set(mapFramePoint.x, -0.1, -mapFramePoint.y);
-                        this.activeWaypointIcon.visible = true;
-                        currentTransport.sendOpRequest({ op: "NAV.MOVE_TO", args: { x: mapFramePoint.x, y: mapFramePoint.y, frame: this.mapFrame } });
+                        this.bots[this.activeBot].waypoint.position.set(mapFramePoint.x, -0.1, -mapFramePoint.y);
+                        this.bots[this.activeBot].waypoint.visible = true;
+                        const yaw = this.getBotToGoalAngle(this.activeBot);
+                        currentTransport.sendOpRequest({
+                            op: "NAV.MOVE_TO", args: {
+                                x: mapFramePoint.x,
+                                y: mapFramePoint.y,
+                                yaw_rad: yaw,
+                                frame: this.mapFrame
+                            }
+                        });
                     }
                 }
             }
@@ -132,16 +146,16 @@ class WaypointPointCloudViewer extends Viewer {
         $(this.renderer.domElement).appendTo(this.card.content);
         animate();
 
-        if(sessionStorage.getItem("lastPclMsg")) {
+        if (sessionStorage.getItem("lastPclMsg")) {
             this.onData(JSON.parse(sessionStorage.getItem("lastPclMsg")));
         }
     }
 
-    updateBotPosition(botName, msg) {
-        if (msg != null) {
-            this.bots[botName].position.x = msg.transform.translation.x
-            this.bots[botName].position.y = msg.transform.translation.y
-            const quaternion = rotationToQuaternion(msg.transform.rotation);
+    updateBotPosition(botName, tfMsg, waypointMsg) {
+        if (tfMsg != null) {
+            this.bots[botName].position.x = tfMsg.transform.translation.x
+            this.bots[botName].position.y = tfMsg.transform.translation.y
+            const quaternion = rotationToQuaternion(tfMsg.transform.rotation);
             const euler = quaternionToEuler(quaternion);
             this.bots[botName].heading = ((euler.z + 3 * Math.PI / 2) % (2 * Math.PI));
 
@@ -156,16 +170,22 @@ class WaypointPointCloudViewer extends Viewer {
             this.bots[botName].position.y = null;
             this.bots[botName].icon.visible = false;
         }
+
+        // Update the bot waypoint icon
+        if (waypointMsg.x && waypointMsg.y) {
+            const y = this.activeBot === botName ? -0.1 : -0.11;
+            this.bots[botName].waypoint.position.set(waypointMsg.x, y, -waypointMsg.y);
+            this.bots[botName].waypoint.visible = true;
+        }
     }
 
     onData(msg) {
         if (msg._topic_name === "/tf") {
             this.activeBot = msg.active_bot === "GEOSURVEY" ? "surveyor" : "digger";
-            this.updateBotPosition("surveyor", msg.surveyor);
-            this.updateBotPosition("digger", msg.digger);
+            this.updateBotPosition("surveyor", msg.surveyor, msg.surveyor_waypoint);
+            this.updateBotPosition("digger", msg.digger, msg.digger_waypoint);
         } else if (msg.__comp) {
             sessionStorage.setItem("lastPclMsg", JSON.stringify(msg));
-            this.mapFrame = msg.header.frame_id;
             this.decodeAndRenderCompressed(msg);
         } else {
             console.warn("Uncompressed pointclouds are not supported")
@@ -214,18 +234,29 @@ class WaypointPointCloudViewer extends Viewer {
             points[3 * i + 2] = (points_view.getUint16(offset + 4, true) / 65535) * zrange + zmin;
         }
 
+        // Add color to the points based on elevation
         const colors = [];
-        for (let i = 0; i < points.length; i+=3) {
+        for (let i = 0; i < points.length; i += 3) {
             const y = points[i + 2];
-            const hue = (((y - 0) * (1 - 0)) /  (0 + 3)) + 0;
+            const hue = (((y - 0) * (1 - 0)) / (0 + 3)) + 0;
             let color = new THREE.Color();
             color.setHSL(hue, 1.0, 0.5);
             colors.push(color.r, color.g, color.b);
         }
-        
+
         this.pointsBuffer.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         this.pointsBuffer.setAttribute('position', new THREE.BufferAttribute(points, 3));
         this.pointsBuffer.rotateX(-Math.PI / 2);
+    }
+
+    getBotToGoalAngle(botName) {
+        if (this.bots[botName].position.x == null || this.bots[botName].waypoint.position.x == null) {
+            return null;
+        }
+
+        const dx = this.bots[botName].waypoint.position.x - this.bots[botName].position.x;
+        const dy = this.bots[botName].waypoint.position.z + this.bots[botName].position.y;
+        return Math.atan2(dy, dx);
     }
 }
 
