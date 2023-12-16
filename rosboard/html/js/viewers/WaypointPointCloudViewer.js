@@ -250,7 +250,7 @@ class WaypointPointCloudViewer extends Viewer {
     }
 
     getBotToGoalAngle(botName) {
-        if (this.bots[botName].position.x == null) {
+        if (this.bots[botName].position.x == null || this.bots[botName].waypoint.position.x == null) {
             return null;
         }
 
