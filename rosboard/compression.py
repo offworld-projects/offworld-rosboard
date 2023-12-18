@@ -128,7 +128,7 @@ def decode_pcl2(cloud, field_names=None, skip_nans=False, uvs=[]):
         points = points.byteswap()
     
     # filter out points above this z value    
-    max_z_value = 2.0
+    max_z_value = 1.0
     filtered_points = points[points['z'] <= max_z_value]
     
 
