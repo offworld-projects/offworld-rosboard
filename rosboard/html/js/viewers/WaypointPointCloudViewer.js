@@ -10,18 +10,27 @@ class WaypointPointCloudViewer extends Viewer {
     this.scene.background = new THREE.Color("#000000");
 
     // Set up the camera and renderer
-    this.camera = new THREE.PerspectiveCamera(
-      75,
-      document.body.clientWidth / document.body.clientHeight,
-      0.1,
-      1000
-    );
+    // this.camera = new THREE.PerspectiveCamera(
+    //   75,
+    //   document.body.clientWidth / document.body.clientHeight,
+    //   0.1,
+    //   1000
+    // );
+    const aspect = document.body.clientWidth / document.body.clientHeight;
+    const frustumSize = 200;
+    var left = (-frustumSize * aspect) / 2;
+    var right = (frustumSize * aspect) / 2;
+    var top = frustumSize / 2;
+    var down = -frustumSize / 2;
+    this.camera = new THREE.OrthographicCamera(
+      left, right,top, down, 1, 1000
+    )
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setSize(
       document.body.clientWidth,
       document.body.clientHeight
     );
-    this.camera.position.set(0, 10, 0);
+    this.camera.position.set(0, 200, 0);
     this.camera.lookAt(0, 0, 0);
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
